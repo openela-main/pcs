@@ -1,0 +1,77 @@
+From 592f79d7e6885b7b82275dc22961009d31b6ad52 Mon Sep 17 00:00:00 2001
+From: Tomas Jelinek <tojeline@redhat.com>
+Date: Tue, 11 Jul 2023 14:09:17 +0200
+Subject: [PATCH 2/2] use a filter when extracting a config backup tarball
+
+---
+ CHANGELOG.md  |  5 +++++
+ pcs/config.py | 26 ++++++++++++++++++++++++--
+ 2 files changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index a1a4277f..4c3b44d8 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -2,11 +2,16 @@
+ 
+ ## [Unreleased]
+ 
++### Security
++- Make use of filters when extracting tarballs to enhance security if provided
++  by Python (`pcs config restore` command) ([rhbz#2219388])
++
+ ### Fixed
+ - Do not display duplicate records in commands `pcs property [config] --all`
+   and `pcs property describe` ([rhbz#2217850])
+ 
+ [rhbz#2217850]: https://bugzilla.redhat.com/show_bug.cgi?id=2217850
++[rhbz#2219388]: https://bugzilla.redhat.com/show_bug.cgi?id=2219388
+ 
+ 
+ ## [0.10.17] - 2023-06-19
+diff --git a/pcs/config.py b/pcs/config.py
+index 39adbc76..26d467a5 100644
+--- a/pcs/config.py
++++ b/pcs/config.py
+@@ -516,14 +516,36 @@ def config_restore_local(infile_name, infile_obj):
+                 if "rename" in extract_info and extract_info["rename"]:
+                     if tmp_dir is None:
+                         tmp_dir = tempfile.mkdtemp()
+-                    tarball.extractall(tmp_dir, [tar_member_info])
++                    if hasattr(tarfile, "data_filter"):
++                        # Safe way of extraction is available since Python 3.12,
++                        # hasattr above checks if it's available.
++                        # It's also backported to 3.11.4, 3.10.12, 3.9.17.
++                        # It may be backported to older versions in downstream.
++                        tarball.extractall(
++                            tmp_dir, [tar_member_info], filter="data"
++                        )
++                    else:
++                        # Unsafe way of extraction
++                        # Remove once we don't support Python 3.8 and older
++                        tarball.extractall(tmp_dir, [tar_member_info])
+                     path_full = extract_info["path"]
+                     shutil.move(
+                         os.path.join(tmp_dir, tar_member_info.name), path_full
+                     )
+                 else:
+                     dir_path = os.path.dirname(extract_info["path"])
+-                    tarball.extractall(dir_path, [tar_member_info])
++                    if hasattr(tarfile, "data_filter"):
++                        # Safe way of extraction is available since Python 3.12,
++                        # hasattr above checks if it's available.
++                        # It's also backported to 3.11.4, 3.10.12, 3.9.17.
++                        # It may be backported to older versions in downstream.
++                        tarball.extractall(
++                            dir_path, [tar_member_info], filter="data"
++                        )
++                    else:
++                        # Unsafe way of extracting
++                        # Remove once we don't support Python 3.8 and older
++                        tarball.extractall(dir_path, [tar_member_info])
+                     path_full = os.path.join(dir_path, tar_member_info.name)
+                 file_attrs = extract_info["attrs"]
+                 os.chmod(path_full, file_attrs["mode"])
+-- 
+2.41.0
+
