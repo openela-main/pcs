@@ -1,0 +1,128 @@
+From 0da95a7f05ae7600eebe30df78a3d4622cd6b4f8 Mon Sep 17 00:00:00 2001
+From: Ondrej Mular <omular@redhat.com>
+Date: Wed, 7 Dec 2022 15:53:25 +0100
+Subject: [PATCH 2/5] fix displaying bool and integer values in `pcs resource
+ config` command
+
+---
+ pcs/cli/resource/output.py             | 18 +++++++++---------
+ pcs_test/resources/cib-resources.xml   |  2 +-
+ pcs_test/tier1/legacy/test_resource.py |  3 ++-
+ pcs_test/tools/resources_dto.py        |  4 ++--
+ 4 files changed, 14 insertions(+), 13 deletions(-)
+
+diff --git a/pcs/cli/resource/output.py b/pcs/cli/resource/output.py
+index 6d1fad16..0705d27b 100644
+--- a/pcs/cli/resource/output.py
++++ b/pcs/cli/resource/output.py
+@@ -69,9 +69,9 @@ def _resource_operation_to_pairs(
+         pairs.append(("interval-origin", operation_dto.interval_origin))
+     if operation_dto.timeout:
+         pairs.append(("timeout", operation_dto.timeout))
+-    if operation_dto.enabled:
++    if operation_dto.enabled is not None:
+         pairs.append(("enabled", _bool_to_cli_value(operation_dto.enabled)))
+-    if operation_dto.record_pending:
++    if operation_dto.record_pending is not None:
+         pairs.append(
+             ("record-pending", _bool_to_cli_value(operation_dto.record_pending))
+         )
+@@ -477,13 +477,13 @@ def _resource_bundle_container_options_to_pairs(
+     options: CibResourceBundleContainerRuntimeOptionsDto,
+ ) -> List[Tuple[str, str]]:
+     option_list = [("image", options.image)]
+-    if options.replicas:
++    if options.replicas is not None:
+         option_list.append(("replicas", str(options.replicas)))
+-    if options.replicas_per_host:
++    if options.replicas_per_host is not None:
+         option_list.append(
+             ("replicas-per-host", str(options.replicas_per_host))
+         )
+-    if options.promoted_max:
++    if options.promoted_max is not None:
+         option_list.append(("promoted-max", str(options.promoted_max)))
+     if options.run_command:
+         option_list.append(("run-command", options.run_command))
+@@ -508,7 +508,7 @@ def _resource_bundle_network_options_to_pairs(
+         network_options.append(
+             ("ip-range-start", bundle_network_dto.ip_range_start)
+         )
+-    if bundle_network_dto.control_port:
++    if bundle_network_dto.control_port is not None:
+         network_options.append(
+             ("control-port", str(bundle_network_dto.control_port))
+         )
+@@ -516,7 +516,7 @@ def _resource_bundle_network_options_to_pairs(
+         network_options.append(
+             ("host-interface", bundle_network_dto.host_interface)
+         )
+-    if bundle_network_dto.host_netmask:
++    if bundle_network_dto.host_netmask is not None:
+         network_options.append(
+             ("host-netmask", str(bundle_network_dto.host_netmask))
+         )
+@@ -531,9 +531,9 @@ def _resource_bundle_port_mapping_to_pairs(
+     bundle_net_port_mapping_dto: CibResourceBundlePortMappingDto,
+ ) -> List[Tuple[str, str]]:
+     mapping = []
+-    if bundle_net_port_mapping_dto.port:
++    if bundle_net_port_mapping_dto.port is not None:
+         mapping.append(("port", str(bundle_net_port_mapping_dto.port)))
+-    if bundle_net_port_mapping_dto.internal_port:
++    if bundle_net_port_mapping_dto.internal_port is not None:
+         mapping.append(
+             ("internal-port", str(bundle_net_port_mapping_dto.internal_port))
+         )
+diff --git a/pcs_test/resources/cib-resources.xml b/pcs_test/resources/cib-resources.xml
+index 67cf5178..524b8fbb 100644
+--- a/pcs_test/resources/cib-resources.xml
++++ b/pcs_test/resources/cib-resources.xml
+@@ -53,7 +53,7 @@
+             </instance_attributes>
+         </op>
+           <op name="migrate_from" timeout="20s" interval="0s" id="R7-migrate_from-interval-0s"/>
+-          <op name="migrate_to" timeout="20s" interval="0s" id="R7-migrate_to-interval-0s"/>
++          <op name="migrate_to" timeout="20s" interval="0s" id="R7-migrate_to-interval-0s" enabled="false" record-pending="false"/>
+           <op name="monitor" timeout="20s" interval="10s" id="R7-monitor-interval-10s"/>
+           <op name="reload" timeout="20s" interval="0s" id="R7-reload-interval-0s"/>
+           <op name="reload-agent" timeout="20s" interval="0s" id="R7-reload-agent-interval-0s"/>
+diff --git a/pcs_test/tier1/legacy/test_resource.py b/pcs_test/tier1/legacy/test_resource.py
+index 2ea5c423..65ad1090 100644
+--- a/pcs_test/tier1/legacy/test_resource.py
++++ b/pcs_test/tier1/legacy/test_resource.py
+@@ -753,7 +753,7 @@ Error: moni=tor does not appear to be a valid operation action
+ 
+         o, r = pcs(
+             self.temp_cib.name,
+-            "resource create --no-default-ops OPTest ocf:heartbeat:Dummy op monitor interval=30s OCF_CHECK_LEVEL=1 op monitor interval=25s OCF_CHECK_LEVEL=1".split(),
++            "resource create --no-default-ops OPTest ocf:heartbeat:Dummy op monitor interval=30s OCF_CHECK_LEVEL=1 op monitor interval=25s OCF_CHECK_LEVEL=1 enabled=0".split(),
+         )
+         ac(o, "")
+         assert r == 0
+@@ -770,6 +770,7 @@ Error: moni=tor does not appear to be a valid operation action
+                   OCF_CHECK_LEVEL=1
+                 monitor: OPTest-monitor-interval-25s
+                   interval=25s
++                  enabled=0
+                   OCF_CHECK_LEVEL=1
+             """
+             ),
+diff --git a/pcs_test/tools/resources_dto.py b/pcs_test/tools/resources_dto.py
+index 8f46f6dd..a980ec80 100644
+--- a/pcs_test/tools/resources_dto.py
++++ b/pcs_test/tools/resources_dto.py
+@@ -233,8 +233,8 @@ PRIMITIVE_R7 = CibResourcePrimitiveDto(
+             start_delay=None,
+             interval_origin=None,
+             timeout="20s",
+-            enabled=None,
+-            record_pending=None,
++            enabled=False,
++            record_pending=False,
+             role=None,
+             on_fail=None,
+             meta_attributes=[],
+-- 
+2.39.0
+

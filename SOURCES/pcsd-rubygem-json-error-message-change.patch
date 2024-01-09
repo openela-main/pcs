@@ -1,0 +1,40 @@
+From 91d13a82a0803f2a4653a2ec9379a27f4555dcb5 Mon Sep 17 00:00:00 2001
+From: Mamoru TASAKA <mtasaka@fedoraproject.org>
+Date: Thu, 8 Dec 2022 22:47:59 +0900
+Subject: [PATCH 3/5] pcsd ruby: adjust to json 2.6.3 error message change
+
+json 2.6.3 now removes line number information from parser
+error message.
+Adjust regex pattern on pcs test code for ruby to support
+this error format.
+
+Fixes #606 .
+---
+ pcsd/test/test_config.rb | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/pcsd/test/test_config.rb b/pcsd/test/test_config.rb
+index 7aaf4349..a580b24f 100644
+--- a/pcsd/test/test_config.rb
++++ b/pcsd/test/test_config.rb
+@@ -126,7 +126,7 @@ class TestConfig < Test::Unit::TestCase
+     assert_equal('error', $logger.log[0][0])
+     assert_match(
+       # the number is based on JSON gem version
+-      /Unable to parse pcs_settings file: \d+: unexpected token/,
++      /Unable to parse pcs_settings file: (\d+: )?unexpected token/,
+       $logger.log[0][1]
+     )
+     assert_equal(fixture_empty_config, cfg.text)
+@@ -723,7 +723,7 @@ class TestCfgKnownHosts < Test::Unit::TestCase
+     assert_equal('error', $logger.log[0][0])
+     assert_match(
+       # the number is based on JSON gem version
+-      /Unable to parse known-hosts file: \d+: unexpected token/,
++      /Unable to parse known-hosts file: (\d+: )?unexpected token/,
+       $logger.log[0][1]
+     )
+     assert_empty_data(cfg)
+-- 
+2.39.0
+
