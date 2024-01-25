@@ -1,0 +1,53 @@
+From 31d18e79bd780614a8d3a6590dc9022094743da5 Mon Sep 17 00:00:00 2001
+From: Ivan Devat <idevat@redhat.com>
+Date: Tue, 20 Nov 2018 15:03:56 +0100
+Subject: [PATCH] do not support cluster setup with udp(u) transport
+
+---
+ pcs/pcs.8.in              | 2 ++
+ pcs/usage.py              | 1 +
+ pcsd/public/css/style.css | 3 +++
+ 3 files changed, 6 insertions(+)
+
+diff --git a/pcs/pcs.8.in b/pcs/pcs.8.in
+index 4d8f1bae..b30d420c 100644
+--- a/pcs/pcs.8.in
++++ b/pcs/pcs.8.in
+@@ -438,6 +438,8 @@ By default, encryption is enabled with cipher=aes256 and hash=sha256. To disable
+ 
+ Transports udp and udpu:
+ .br
++WARNING: These transports are not supported in RHEL 8.
++.br
+ These transports are limited to one address per node. They do not support traffic encryption nor compression.
+ .br
+ Transport options are: ip_version, netmtu
+diff --git a/pcs/usage.py b/pcs/usage.py
+index dee8639f..9bb7afb8 100644
+--- a/pcs/usage.py
++++ b/pcs/usage.py
+@@ -1036,6 +1036,7 @@ Commands:
+             hash=sha256. To disable encryption, set cipher=none and hash=none.
+ 
+         Transports udp and udpu:
++        WARNING: These transports are not supported in RHEL 8.
+         These transports are limited to one address per node. They do not
+         support traffic encryption nor compression.
+         Transport options are:
+diff --git a/pcsd/public/css/style.css b/pcsd/public/css/style.css
+index 2f26e831..a7702ac4 100644
+--- a/pcsd/public/css/style.css
++++ b/pcsd/public/css/style.css
+@@ -949,6 +949,9 @@ table.args-table td.reg {
+   width: 6ch;
+   text-align: right;
+ }
++#csetup-transport .transport-types {
++  display: none;
++}
+ #csetup-transport-options.udp .knet-only,
+ #csetup-transport-options.knet .without-knet
+ {
+-- 
+2.41.0
+

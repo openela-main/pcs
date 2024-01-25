@@ -1,0 +1,331 @@
+From 13efdd334514daeff8a2f7c3e89c3ed6a64a9bef Mon Sep 17 00:00:00 2001
+From: Miroslav Lisik <mlisik@redhat.com>
+Date: Tue, 27 Jun 2023 11:59:00 +0200
+Subject: [PATCH 1/2] fix displaying duplicate records in property commands
+
+---
+ CHANGELOG.md                                  |  9 +++
+ pcs/cli/cluster_property/output.py            | 65 +++++++++----------
+ .../cli/cluster_property/test_command.py      | 15 +++++
+ .../tier0/cli/cluster_property/test_output.py | 33 ++++++----
+ .../lib/commands/test_cluster_property.py     | 28 ++++++++
+ 5 files changed, 103 insertions(+), 47 deletions(-)
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 0ca054e1..a1a4277f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,14 @@
+ # Change Log
+ 
++## [Unreleased]
++
++### Fixed
++- Do not display duplicate records in commands `pcs property [config] --all`
++  and `pcs property describe` ([rhbz#2217850])
++
++[rhbz#2217850]: https://bugzilla.redhat.com/show_bug.cgi?id=2217850
++
++
+ ## [0.10.17] - 2023-06-19
+ 
+ ### Added
+diff --git a/pcs/cli/cluster_property/output.py b/pcs/cli/cluster_property/output.py
+index 12d626f1..1af93ea3 100644
+--- a/pcs/cli/cluster_property/output.py
++++ b/pcs/cli/cluster_property/output.py
+@@ -34,21 +34,15 @@ class PropertyConfigurationFacade:
+         readonly_properties: StringCollection,
+     ) -> None:
+         self._properties = properties
++        self._first_nvpair_set = (
++            self._properties[0].nvpairs if self._properties else []
++        )
+         self._properties_metadata = properties_metadata
+         self._readonly_properties = readonly_properties
+-        self._defaults_map = {
+-            metadata.name: metadata.default
+-            for metadata in self._properties_metadata
+-            if metadata.default is not None
++        self._defaults_map = self.get_defaults(include_advanced=True)
++        self._name_nvpair_dto_map = {
++            nvpair_dto.name: nvpair_dto for nvpair_dto in self._first_nvpair_set
+         }
+-        self._name_nvpair_dto_map = (
+-            {
+-                nvpair_dto.name: nvpair_dto
+-                for nvpair_dto in self._properties[0].nvpairs
+-            }
+-            if self._properties
+-            else {}
+-        )
+ 
+     @classmethod
+     def from_properties_dtos(
+@@ -108,17 +102,6 @@ class PropertyConfigurationFacade:
+             return value
+         return self._defaults_map.get(property_name, custom_default)
+ 
+-    @staticmethod
+-    def _filter_names_advanced(
+-        metadata: ResourceAgentParameterDto,
+-        property_names: Optional[StringSequence] = None,
+-        include_advanced: bool = False,
+-    ) -> bool:
+-        return bool(
+-            (not property_names and (include_advanced or not metadata.advanced))
+-            or (property_names and metadata.name in property_names)
+-        )
+-
+     def get_defaults(
+         self,
+         property_names: Optional[StringSequence] = None,
+@@ -126,11 +109,10 @@ class PropertyConfigurationFacade:
+     ) -> Dict[str, str]:
+         return {
+             metadata.name: metadata.default
+-            for metadata in self._properties_metadata
+-            if metadata.default is not None
+-            and self._filter_names_advanced(
+-                metadata, property_names, include_advanced
++            for metadata in self.get_properties_metadata(
++                property_names, include_advanced
+             )
++            if metadata.default is not None
+         }
+ 
+     def get_properties_metadata(
+@@ -138,23 +120,34 @@ class PropertyConfigurationFacade:
+         property_names: Optional[StringSequence] = None,
+         include_advanced: bool = False,
+     ) -> Sequence[ResourceAgentParameterDto]:
+-        return [
+-            metadata
+-            for metadata in self._properties_metadata
+-            if self._filter_names_advanced(
+-                metadata, property_names, include_advanced
+-            )
+-        ]
++        if property_names:
++            filtered_metadata = [
++                metadata
++                for metadata in self._properties_metadata
++                if metadata.name in property_names
++            ]
++        else:
++            filtered_metadata = [
++                metadata
++                for metadata in self._properties_metadata
++                if include_advanced or not metadata.advanced
++            ]
++        deduplicated_metadata = {
++            metadata.name: metadata for metadata in filtered_metadata
++        }
++        return list(deduplicated_metadata.values())
+ 
+     def get_name_value_default_list(self) -> List[Tuple[str, str, bool]]:
+         name_value_default_list = [
+             (nvpair_dto.name, nvpair_dto.value, False)
+-            for nvpair_dto in self._name_nvpair_dto_map.values()
++            for nvpair_dto in self._first_nvpair_set
+         ]
+         name_value_default_list.extend(
+             [
+                 (metadata_dto.name, metadata_dto.default, True)
+-                for metadata_dto in self._properties_metadata
++                for metadata_dto in self.get_properties_metadata(
++                    include_advanced=True
++                )
+                 if metadata_dto.name not in self._name_nvpair_dto_map
+                 and metadata_dto.default is not None
+             ]
+diff --git a/pcs_test/tier0/cli/cluster_property/test_command.py b/pcs_test/tier0/cli/cluster_property/test_command.py
+index 14c8f6c1..702266f0 100644
+--- a/pcs_test/tier0/cli/cluster_property/test_command.py
++++ b/pcs_test/tier0/cli/cluster_property/test_command.py
+@@ -21,6 +21,21 @@ from pcs_test.tools.misc import dict_to_modifiers
+ 
+ FIXTURE_PROPERTY_METADATA = ClusterPropertyMetadataDto(
+     properties_metadata=[
++        ResourceAgentParameterDto(
++            name="property_name",
++            shortdesc="Duplicate property",
++            longdesc=None,
++            type="string",
++            default="duplicate_default",
++            enum_values=None,
++            required=False,
++            advanced=False,
++            deprecated=False,
++            deprecated_by=[],
++            deprecated_desc=None,
++            unique_group=None,
++            reloadable=False,
++        ),
+         ResourceAgentParameterDto(
+             name="property_name",
+             shortdesc=None,
+diff --git a/pcs_test/tier0/cli/cluster_property/test_output.py b/pcs_test/tier0/cli/cluster_property/test_output.py
+index a4281a74..f10b0492 100644
+--- a/pcs_test/tier0/cli/cluster_property/test_output.py
++++ b/pcs_test/tier0/cli/cluster_property/test_output.py
+@@ -21,6 +21,7 @@ FIXTURE_TWO_PROPERTY_SETS = [
+             CibNvpairDto(id="", name="readonly2", value="ro_val2"),
+             CibNvpairDto(id="", name="property2", value="val2"),
+             CibNvpairDto(id="", name="property1", value="val1"),
++            CibNvpairDto(id="", name="property1", value="duplicate_val1"),
+         ],
+     ),
+     CibNvsetDto(
+@@ -39,6 +40,7 @@ FIXTURE_READONLY_PROPERTIES_LIST = ["readonly1", "readonly2"]
+ FIXTURE_TEXT_OUTPUT_FIRST_SET = dedent(
+     """\
+     Cluster Properties: id1 score=150
++      property1=duplicate_val1
+       property1=val1
+       property2=val2
+       readonly1=ro_val1
+@@ -49,7 +51,7 @@ FIXTURE_TEXT_OUTPUT_FIRST_SET = dedent(
+ FIXTURE_LEGACY_TEXT_OUTPUT_FIRST_SET = dedent(
+     """\
+     Cluster Properties:
+-     property1: val1
++     property1: duplicate_val1
+      property2: val2
+      readonly1: ro_val1
+      readonly2: ro_val2
+@@ -85,6 +87,7 @@ def fixture_property_metadata(
+ 
+ 
+ FIXTURE_PROPERTY_METADATA_LIST = [
++    fixture_property_metadata(name="property1", default="duplicate_default1"),
+     fixture_property_metadata(name="property1", default="default1"),
+     fixture_property_metadata(name="property2", default="default2"),
+     fixture_property_metadata(
+@@ -164,7 +167,7 @@ class TestPropertyConfigurationFacadeGetPropertyValue(TestCase):
+         )
+ 
+     def test_property_value_from_first_set(self):
+-        self.assertEqual(self.facade.get_property_value("property1"), "val1")
++        self.assertEqual(self.facade.get_property_value("property2"), "val2")
+ 
+     def test_property_value_from_second_set(self):
+         self.assertEqual(self.facade.get_property_value("property3"), None)
+@@ -180,6 +183,11 @@ class TestPropertyConfigurationFacadeGetPropertyValue(TestCase):
+             "custom",
+         )
+ 
++    def test_property_with_multiple_values(self):
++        self.assertEqual(
++            self.facade.get_property_value("property1"), "duplicate_val1"
++        )
++
+ 
+ class TestPropertyConfigurationFacadeGetPropertyValueOrDefault(TestCase):
+     def setUp(self):
+@@ -191,7 +199,7 @@ class TestPropertyConfigurationFacadeGetPropertyValueOrDefault(TestCase):
+ 
+     def test_property_value_from_first_set(self):
+         self.assertEqual(
+-            self.facade.get_property_value_or_default("property1"), "val1"
++            self.facade.get_property_value_or_default("property2"), "val2"
+         )
+ 
+     def test_property_value_not_in_set(self):
+@@ -267,21 +275,22 @@ class TestPropertyConfigurationFacadeGetPropertiesMetadata(TestCase):
+         )
+ 
+     def test_metadata_without_advanced(self):
+-        metadata = FIXTURE_PROPERTY_METADATA_LIST[0:2]
+-        self.assertEqual(self.facade.get_properties_metadata(), metadata)
++        metadata = FIXTURE_PROPERTY_METADATA_LIST[1:3]
++        self.assertCountEqual(self.facade.get_properties_metadata(), metadata)
+ 
+     def test_metadata_with_advanced(self):
+-        metadata = FIXTURE_PROPERTY_METADATA_LIST
+-        self.assertEqual(
+-            self.facade.get_properties_metadata(include_advanced=True), metadata
++        metadata = FIXTURE_PROPERTY_METADATA_LIST[1:]
++        self.assertCountEqual(
++            self.facade.get_properties_metadata(include_advanced=True),
++            metadata,
+         )
+ 
+     def test_metadata_specified(self):
+         metadata = (
+-            FIXTURE_PROPERTY_METADATA_LIST[0:1]
++            FIXTURE_PROPERTY_METADATA_LIST[1:2]
+             + FIXTURE_PROPERTY_METADATA_LIST[-1:]
+         )
+-        self.assertEqual(
++        self.assertCountEqual(
+             self.facade.get_properties_metadata(
+                 property_names=["property4", "property1"]
+             ),
+@@ -303,6 +312,7 @@ class TestPropertyConfigurationFacadeGetNameValueDefaultList(TestCase):
+             ("readonly2", "ro_val2", False),
+             ("property2", "val2", False),
+             ("property1", "val1", False),
++            ("property1", "duplicate_val1", False),
+             ("property3", "default3", True),
+             ("property4", "default4", True),
+         ]
+@@ -531,7 +541,8 @@ class TestPropertiesToCmd(TestCase):
+             """\
+             pcs property set --force -- \\
+               property2=val2 \\
+-              property1=val1
++              property1=val1 \\
++              property1=duplicate_val1
+             """
+         )
+         self.assert_lines(facade, output)
+diff --git a/pcs_test/tier0/lib/commands/test_cluster_property.py b/pcs_test/tier0/lib/commands/test_cluster_property.py
+index 4a985b5d..92486703 100644
+--- a/pcs_test/tier0/lib/commands/test_cluster_property.py
++++ b/pcs_test/tier0/lib/commands/test_cluster_property.py
+@@ -890,6 +890,10 @@ class TestGetProperties(TestCase):
+         )
+         self.env_assist.assert_reports([])
+ 
++    @mock.patch(
++        "pcs.lib.cib.rule.in_effect.has_rule_in_effect_status_tool",
++        lambda: True,
++    )
+     def test_evaluate_expired_but_no_set_rule(self):
+         self.config.runner.cib.load(
+             crm_config=fixture_crm_config_properties([("set_id", {})])
+@@ -903,6 +907,30 @@ class TestGetProperties(TestCase):
+             ),
+         )
+ 
++    @mock.patch(
++        "pcs.lib.cib.rule.in_effect.has_rule_in_effect_status_tool",
++        lambda: False,
++    )
++    def test_evaluate_expired_no_status_tool(self):
++        self.config.runner.cib.load(
++            crm_config=fixture_crm_config_properties([("set_id", {})])
++        )
++        self.assertEqual(
++            self.command(evaluate_expired=True),
++            ListCibNvsetDto(
++                nvsets=[
++                    CibNvsetDto(id="set_id", options={}, rule=None, nvpairs=[])
++                ]
++            ),
++        )
++        self.env_assist.assert_reports(
++            [
++                fixture.warn(
++                    reports.codes.RULE_IN_EFFECT_STATUS_DETECTION_NOT_SUPPORTED,
++                )
++            ]
++        )
++
+ 
+ class TestGetPropertiesMetadata(MetadataErrorMixin, TestCase):
+     _load_cib_when_metadata_error = False
+-- 
+2.41.0
+
