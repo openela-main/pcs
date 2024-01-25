@@ -1,0 +1,84 @@
+From ce48dbe8b410b2dc4f3159e22c243c1d8824cba0 Mon Sep 17 00:00:00 2001
+From: Miroslav Lisik <mlisik@redhat.com>
+Date: Thu, 16 Mar 2023 11:32:40 +0100
+Subject: [PATCH 1/2] fix `pcs config checkpoint diff` command
+
+---
+ pcs/cli/common/lib_wrapper.py | 15 +--------------
+ pcs/config.py                 |  3 +++
+ 2 files changed, 4 insertions(+), 14 deletions(-)
+
+diff --git a/pcs/cli/common/lib_wrapper.py b/pcs/cli/common/lib_wrapper.py
+index 0643a808..b17f43b1 100644
+--- a/pcs/cli/common/lib_wrapper.py
++++ b/pcs/cli/common/lib_wrapper.py
+@@ -1,9 +1,5 @@
+ import logging
+ from collections import namedtuple
+-from typing import (
+-    Any,
+-    Dict,
+-)
+ 
+ from pcs import settings
+ from pcs.cli.common import middleware
+@@ -36,9 +32,6 @@ from pcs.lib.commands.constraint import order as constraint_order
+ from pcs.lib.commands.constraint import ticket as constraint_ticket
+ from pcs.lib.env import LibraryEnvironment
+ 
+-# Note: not properly typed
+-_CACHE: Dict[Any, Any] = {}
+-
+ 
+ def wrapper(dictionary):
+     return namedtuple("wrapper", dictionary.keys())(**dictionary)
+@@ -106,12 +99,6 @@ def bind_all(env, run_with_middleware, dictionary):
+     )
+ 
+ 
+-def get_module(env, middleware_factory, name):
+-    if name not in _CACHE:
+-        _CACHE[name] = load_module(env, middleware_factory, name)
+-    return _CACHE[name]
+-
+-
+ def load_module(env, middleware_factory, name):
+     # pylint: disable=too-many-return-statements, too-many-branches
+     if name == "acl":
+@@ -541,4 +528,4 @@ class Library:
+         self.middleware_factory = middleware_factory
+ 
+     def __getattr__(self, name):
+-        return get_module(self.env, self.middleware_factory, name)
++        return load_module(self.env, self.middleware_factory, name)
+diff --git a/pcs/config.py b/pcs/config.py
+index 6c90c13f..25007d26 100644
+--- a/pcs/config.py
++++ b/pcs/config.py
+@@ -711,6 +711,7 @@ def _checkpoint_to_lines(lib, checkpoint_number):
+     orig_usefile = utils.usefile
+     orig_filename = utils.filename
+     orig_middleware = lib.middleware_factory
++    orig_env = lib.env
+     # configure old code to read the CIB from a file
+     utils.usefile = True
+     utils.filename = os.path.join(
+@@ -720,6 +721,7 @@ def _checkpoint_to_lines(lib, checkpoint_number):
+     lib.middleware_factory = orig_middleware._replace(
+         cib=middleware.cib(utils.filename, utils.touch_cib_file)
+     )
++    lib.env = utils.get_cli_env()
+     # export the CIB to text
+     result = False, []
+     if os.path.isfile(utils.filename):
+@@ -728,6 +730,7 @@ def _checkpoint_to_lines(lib, checkpoint_number):
+     utils.usefile = orig_usefile
+     utils.filename = orig_filename
+     lib.middleware_factory = orig_middleware
++    lib.env = orig_env
+     return result
+ 
+ 
+-- 
+2.39.2
+
