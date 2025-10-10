@@ -1,6 +1,6 @@
 Name:                 pcs
-Version:              0.10.17
-Release:              2%{?dist}
+Version:              0.10.18
+Release:              2%{?dist}.6
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -22,13 +22,8 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 
 # When specifying a commit, use its long hash
 %global version_or_commit %{version}
-# %%global version_or_commit d5642c2ede0d6555603bc385dc35e581d2f0fddd
+# %%global version_or_commit 1fa11fa39029896939a5545968ed60ede714b992
 %global pcs_source_name %{name}-%{version_or_commit}
-
-# ui_commit can be determined by hash, tag or branch
-%global ui_commit 0.1.13
-%global ui_modules_version 0.1.13
-%global ui_src_name pcs-web-ui-%{ui_commit}
 
 %global pcs_snmp_pkg_name  pcs-snmp
 
@@ -38,19 +33,19 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 %global dateutil_version  2.8.2
 %global version_rubygem_backports  3.24.1
 %global version_rubygem_ethon  0.16.0
-%global version_rubygem_ffi  1.15.5
+%global version_rubygem_ffi  1.16.3
 %global version_rubygem_json  2.6.3
 %global version_rubygem_mustermann  2.0.2
 %global version_rubygem_nio4r 2.5.9
 %global version_rubygem_open4  1.3.4
-%global version_rubygem_puma 6.3.0
-%global version_rubygem_rack  2.2.7
+%global version_rubygem_puma 6.4.0
+%global version_rubygem_rack  2.2.16
 %global version_rubygem_rack_protection  2.2.4
 %global version_rubygem_rack_test  2.1.0
-%global version_rubygem_rexml  3.2.5
+%global version_rubygem_rexml  3.4.1
 %global version_rubygem_ruby2_keywords  0.0.5
 %global version_rubygem_sinatra  2.2.4
-%global version_rubygem_tilt  2.2.0
+%global version_rubygem_tilt  2.3.0
 
 # javascript bundled libraries for old web-ui
 %global ember_version 1.4.0
@@ -60,7 +55,7 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 
 # DO NOT UPDATE
 # Tornado 6.2 requires Python 3.7+
-%global tornado_version    6.1.0
+%global tornado_version    6.1.0.pcs.2
 
 %global pcs_bundled_dir pcs_bundled
 %global pcsd_public_dir pcsd/public
@@ -92,7 +87,7 @@ Source0:              %{url}/archive/%{?v_prefix}%{version_or_commit}/%{pcs_sour
 Source1:              HAM-logo.png
 
 Source41:             https://github.com/ondrejmular/pyagentx/archive/v%{pyagentx_version}/pyagentx-%{pyagentx_version}.tar.gz
-Source42:             https://github.com/tornadoweb/tornado/archive/v%{tornado_version}/tornado-%{tornado_version}.tar.gz
+Source42:             https://github.com/CtrlZmaster/tornado/archive/v%{tornado_version}/tornado-%{tornado_version}.tar.gz
 Source43:             https://github.com/ericvsmith/dataclasses/archive/%{dataclasses_version}/dataclasses-%{dataclasses_version}.tar.gz
 Source44:             https://github.com/konradhalas/dacite/archive/v%{dacite_version}/dacite-%{dacite_version}.tar.gz
 Source45:             https://pypi.python.org/packages/source/p/python-dateutil/python-dateutil-%{dateutil_version}.tar.gz
@@ -116,17 +111,12 @@ Source93:             https://rubygems.org/downloads/nio4r-%{version_rubygem_nio
 Source94:             https://rubygems.org/downloads/puma-%{version_rubygem_puma}.gem
 Source95:             https://rubygems.org/downloads/ruby2_keywords-%{version_rubygem_ruby2_keywords}.gem
 
-Source100:            https://github.com/ClusterLabs/pcs-web-ui/archive/%{ui_commit}/%{ui_src_name}.tar.gz
-Source101:            https://github.com/ClusterLabs/pcs-web-ui/releases/download/%{ui_modules_version}/pcs-web-ui-node-modules-%{ui_modules_version}.tar.xz
-
 # pcs patches: <= 200
 # Patch1: bzNUMBER-01-name.patch
 Patch1:               do-not-support-cluster-setup-with-udp-u-transport.patch
-Patch2:               bz2218841-01-fix-displaying-duplicate-records-in-property-command.patch
-Patch3:               bz2219388-01-use-a-filter-when-extracting-a-config-backup-tarball.patch
-
-# ui patches: >200
-# Patch201: bzNUMBER-01-name.patch
+Patch2:               RHEL-17280-01-disable-new-webui-routes.patch
+Patch3:               RHEL-65595-stop-sending-http-headers-to-ruby-part-of-pcsd.patch
+Patch4:               RHEL-90147-support-for-query-limits-in-rack.patch
 
 # git for patches
 BuildRequires:        git-core
@@ -170,9 +160,6 @@ BuildRequires:        make
 BuildRequires:        overpass-fonts
 # Red Hat logo for creating symlink of favicon
 BuildRequires:        redhat-logos
-
-# for building web ui
-BuildRequires:        npm
 
 # cluster stack packages for pkg-config
 BuildRequires:        booth
@@ -255,7 +242,7 @@ Summary:              Pacemaker cluster SNMP agent
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
 # BSD-2-Clause: pyagentx
-License:              GPL-2.0-only and BSD-2-Clause
+License:              GPL-2.0-only AND BSD-2-Clause
 URL:                  https://github.com/ClusterLabs/pcs
 
 # tar for unpacking pyagentx source tarball
@@ -313,11 +300,6 @@ update_times_patch(){
 # documentation for setup/autosetup/autopatch:
 #   * http://ftp.rpm.org/max-rpm/s1-rpm-inside-macros.html
 #   * https://rpm-software-management.github.io/rpm/manual/autosetup.html
-# patch web-ui sources
-%autosetup -D -T -b 100 -a 101 -S git -n %{ui_src_name} -N
-%autopatch -p1 -m 201
-# update_times_patch %%{PATCH201}
-
 # patch pcs sources
 %autosetup -S git -n %{pcs_source_name} -N
 %autopatch -p1 -M 200
@@ -325,6 +307,7 @@ update_times_patch(){
 update_times_patch %{PATCH1}
 update_times_patch %{PATCH2}
 update_times_patch %{PATCH3}
+update_times_patch %{PATCH4}
 
 # generate .tarball-version if building from an untagged commit, not a released version
 # autogen uses git-version-gen which uses .tarball-version for generating version number
@@ -370,11 +353,11 @@ cp -f %SOURCE45 rpm/
 %define debug_package %{nil}
 
 ./autogen.sh
-%{configure} --enable-local-build --enable-use-local-cache-only --enable-individual-bundling --enable-booth-enable-authfile-set --enable-booth-enable-authfile-unset PYTHON=%{__python3} ruby_CFLAGS="%{optflags}" ruby_LIBS="%{build_ldflags}"
+%{configure} --enable-local-build --enable-use-local-cache-only \
+  --enable-individual-bundling \
+  --enable-booth-enable-authfile-set --enable-booth-enable-authfile-unset \
+  PYTHON=%{__python3} ruby_CFLAGS="%{optflags}" ruby_LIBS="%{build_ldflags}"
 make all
-
-# build pcs-web-ui
-make -C %{_builddir}/%{ui_src_name} build BUILD_USE_EXISTING_NODE_MODULES=true
 
 %install
 rm -rf $RPM_BUILD_ROOT
@@ -382,8 +365,9 @@ pwd
 
 %make_install
 
-# something like make install for pcs-web-ui
-cp -r %{_builddir}/%{ui_src_name}/build  ${RPM_BUILD_ROOT}%{_libdir}/%{pcsd_public_dir}/ui
+# RHEL-7715 - fix rubygem permissions - remove write access for owner's group
+# and other users
+chmod --recursive g-w,o-w ${RPM_BUILD_ROOT}%{_libdir}/%{rubygem_bundle_dir}
 
 # prepare license files
 # some rubygems do not have a license file (thin)
@@ -580,8 +564,61 @@ remove_all_tests
 %license pyagentx_LICENSE.txt
 
 %changelog
-* Thu Jan 25 2024 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.17
+* Fri Oct 10 2025 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
 - Debrand PCS
+
+* Mon Jun 23 2025 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.6
+- Fixed CVE-2024-49761 by updating rubygem rexml
+  Resolves: RHEL-98708
+
+* Thu May 22 2025 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.5
+- Fixed CVE-2024-47287 by patching bundled Tornado
+  Resolves: RHEL-93167
+- Fixed CVE-2025-46727 by updating bundled rubygem rack
+  Resolves: RHEL-90147
+
+* Tue Mar 4 2025 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.4
+- Fixed CVE-2024-52804 by patching bundled Tornado
+  Resolves: RHEL-81924
+
+* Wed Dec 4 2024 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2.el8_10.3
+- Prevented any future HTTP header-based attacks on puma/sinatra by removing any headers not recognized by pcsd
+  Resolves: RHEL-65595
+
+* Thu Aug 29 2024 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2.el8_10.2
+- Updated rubygem rexml
+  Resolves: RHEL-52409, RHEL-52788, RHEL-55997
+
+* Wed Mar 20 2024 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2
+- Updated rubygem rexml
+  Resolves: RHEL-37883
+
+* Wed Mar 20 2024 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2
+- Fixed CVE-2024-25126, CVE-2024-26141, CVE-2024-26146 in bundled dependency rack
+  Resolves: RHEL-26445, RHEL-26447, RHEL-26449
+
+* Mon Jan 8 2024 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-1
+- Rebased to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-7741
+
+* Fri Dec 8 2023 Michal Pospisil <mpospisi@redhat.com> - 0.10.17-6
+- Rebased to the latest upstream sources (see CHANGELOG.md)
+- Remove the preview of the new pcs web interface
+  Resolves: RHEL-17280
+
+* Tue Nov 14 2023 Michal Pospisil <mpospisi@redhat.com> - 0.10.17-5
+- Rebased to the latest upstream sources (see CHANGELOG.md)
+  Resolves: RHEL-7584, RHEL-7668, RHEL-7729, RHEL-7731, RHEL-7732, RHEL-7741, RHEL-7742, RHEL-7743, RHEL-7745, RHEL-8467
+- Tightened permissions of bundled rubygems to be 755 or stricter
+  Resolves: RHEL-7715
+
+* Mon Nov 6 2023 Michal Pospisil <mpospisi@redhat.com> - 0.10.17-4
+- No changes, fixed an error in the new quality control process
+- Resolves: RHEL-15218
+
+* Wed Nov 1 2023 Michal Pospisil <mpospisi@redhat.com> - 0.10.17-3
+- No changes, testing a new quality control process
+- Resolves: RHEL-15218
 
 * Thu Jul 13 2023 Michal Pospisil <mpospisi@redhat.com> - 0.10.17-2
 - Make use of filters when extracting tarballs to enhance security if provided by Python (`pcs config restore` command)

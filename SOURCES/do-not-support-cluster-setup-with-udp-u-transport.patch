@@ -1,7 +1,7 @@
-From 31d18e79bd780614a8d3a6590dc9022094743da5 Mon Sep 17 00:00:00 2001
+From 854efcf148c82e5a5e4f0afd71cc3333ea4a8ce4 Mon Sep 17 00:00:00 2001
 From: Ivan Devat <idevat@redhat.com>
 Date: Tue, 20 Nov 2018 15:03:56 +0100
-Subject: [PATCH] do not support cluster setup with udp(u) transport
+Subject: [PATCH 1/2] do not support cluster setup with udp(u) transport
 
 ---
  pcs/pcs.8.in              | 2 ++
@@ -10,7 +10,7 @@ Subject: [PATCH] do not support cluster setup with udp(u) transport
  3 files changed, 6 insertions(+)
 
 diff --git a/pcs/pcs.8.in b/pcs/pcs.8.in
-index 4d8f1bae..b30d420c 100644
+index d504e8b4..93202d05 100644
 --- a/pcs/pcs.8.in
 +++ b/pcs/pcs.8.in
 @@ -438,6 +438,8 @@ By default, encryption is enabled with cipher=aes256 and hash=sha256. To disable
@@ -23,10 +23,10 @@ index 4d8f1bae..b30d420c 100644
  .br
  Transport options are: ip_version, netmtu
 diff --git a/pcs/usage.py b/pcs/usage.py
-index dee8639f..9bb7afb8 100644
+index f4b84202..ee10370a 100644
 --- a/pcs/usage.py
 +++ b/pcs/usage.py
-@@ -1036,6 +1036,7 @@ Commands:
+@@ -1038,6 +1038,7 @@ Commands:
              hash=sha256. To disable encryption, set cipher=none and hash=none.
  
          Transports udp and udpu:
@@ -49,5 +49,5 @@ index 2f26e831..a7702ac4 100644
  #csetup-transport-options.knet .without-knet
  {
 -- 
-2.41.0
+2.43.0
 

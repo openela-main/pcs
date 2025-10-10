@@ -1,0 +1,55 @@
+From 957856a556f5ed92129ce602538c3df3aebce7a3 Mon Sep 17 00:00:00 2001
+From: Ivan Devat <idevat@redhat.com>
+Date: Tue, 5 Dec 2023 15:18:35 +0100
+Subject: [PATCH 2/2] disable alternative webui routes
+
+This commit is intended to be downstream only.
+
+The new web ui was part of rhel8 as a technical preview. But new web ui
+is now the main in rhel9 and there is no need to keep it in rhel8.
+To prevent unnecessary maintenance burden it is disabled now.
+No handler code is removed, just routing disabled.
+---
+ pcs/daemon/run.py | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
+
+diff --git a/pcs/daemon/run.py b/pcs/daemon/run.py
+index 7fdeda2a..0a6b1b21 100644
+--- a/pcs/daemon/run.py
++++ b/pcs/daemon/run.py
+@@ -81,16 +81,22 @@ def configure_app(
+             routes.extend(
+                 # old web ui by default
+                 [(r"/", RedirectHandler, dict(url="/manage"))]
+-                + [(r"/ui", RedirectHandler, dict(url="/ui/"))]
+-                + ui.get_routes(
+-                    url_prefix="/ui/",
+-                    app_dir=os.path.join(public_dir, "ui"),
+-                    fallback_page_path=os.path.join(
+-                        public_dir,
+-                        "ui_instructions.html",
+-                    ),
+-                    session_storage=session_storage,
+-                )
++                # The following disabled routes was for the new web ui. The new
++                # web ui was here as a technical preview. But new web ui is now
++                # the main in rhel9 and there is no need to keep it in rhel8.
++                # To prevent unnecessary maintenance burden it is disabled now.
++                # No handler code is removed, just routing disabled.
++                #
++                # + [(r"/ui", RedirectHandler, dict(url="/ui/"))]
++                # + ui.get_routes(
++                #     url_prefix="/ui/",
++                #     app_dir=os.path.join(public_dir, "ui"),
++                #     fallback_page_path=os.path.join(
++                #         public_dir,
++                #         "ui_instructions.html",
++                #     ),
++                #     session_storage=session_storage,
++                # )
+                 + sinatra_ui.get_routes(
+                     session_storage, ruby_pcsd_wrapper, public_dir
+                 )
+-- 
+2.43.0
+

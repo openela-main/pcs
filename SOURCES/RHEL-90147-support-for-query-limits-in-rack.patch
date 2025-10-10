@@ -1,0 +1,45 @@
+From 0ad47ec40b7a9a2cb6bdbdf11e1e5b3c59f49b8b Mon Sep 17 00:00:00 2001
+From: Miroslav Lisik <mlisik@redhat.com>
+Date: Tue, 20 May 2025 16:34:18 +0200
+Subject: [PATCH] support for query limits in rack
+
+---
+ pcsd/conf/pcsd | 6 ++++++
+ pcsd/pcsd.rb   | 5 +++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/pcsd/conf/pcsd b/pcsd/conf/pcsd
+index 98df4744..65a9c9a9 100644
+--- a/pcsd/conf/pcsd
++++ b/pcsd/conf/pcsd
+@@ -45,5 +45,11 @@ PCSD_SESSION_LIFETIME=3600
+ # is 50 (even if set lower).
+ PCSD_RESTART_AFTER_REQUESTS=200
+ 
++# These environment variables set the maximum query string bytesize and the
++# maximum number of query parameters that pcsd will attempt to parse.
++# See CVE-2025-46727 for details.
++#RACK_QUERY_PARSER_BYTESIZE_LIMIT=4194304
++#RACK_QUERY_PARSER_PARAMS_LIMIT=4096
++
+ # Do not change
+ RACK_ENV=production
+diff --git a/pcsd/pcsd.rb b/pcsd/pcsd.rb
+index 11698f54..a2634e4e 100644
+--- a/pcsd/pcsd.rb
++++ b/pcsd/pcsd.rb
+@@ -90,6 +90,11 @@ configure do
+   CAPABILITIES_PCSD = capabilities_pcsd.freeze
+ end
+ 
++error Rack::QueryParser::QueryLimitError do
++  $logger.warn(env['sinatra.error'].message)
++  return 400, env['sinatra.error'].message
++end
++
+ def run_cfgsync
+   node_connected = true
+   if Cfgsync::ConfigSyncControl.sync_thread_allowed?()
+-- 
+2.49.0
+
