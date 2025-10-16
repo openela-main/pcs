@@ -1,0 +1,280 @@
+From 196be7e21aeb9e1a656e94136f7f15139c56b6e1 Mon Sep 17 00:00:00 2001
+From: Peter Romancik <promanci@redhat.com>
+Date: Thu, 13 Feb 2025 11:03:20 +0100
+Subject: [PATCH 2/2] fix deletion of misconfigured bundles
+
+---
+ pcs/common/reports/codes.py                   |  3 +
+ pcs/common/reports/messages.py                | 30 +++++++++
+ pcs/lib/cib/remove_elements.py                | 59 +++++++++++------
+ .../tier0/common/reports/test_messages.py     | 23 +++++++
+ pcs_test/tier0/lib/commands/test_cib.py       | 66 +++++++++++++++++++
+ 5 files changed, 162 insertions(+), 19 deletions(-)
+
+diff --git a/pcs/common/reports/codes.py b/pcs/common/reports/codes.py
+index 3f0e669b5..bcee00cd7 100644
+--- a/pcs/common/reports/codes.py
++++ b/pcs/common/reports/codes.py
+@@ -176,6 +176,9 @@ CLUSTER_UUID_ALREADY_SET = M("CLUSTER_UUID_ALREADY_SET")
+ CLUSTER_WILL_BE_DESTROYED = M("CLUSTER_WILL_BE_DESTROYED")
+ COMMAND_INVALID_PAYLOAD = M("COMMAND_INVALID_PAYLOAD")
+ COMMAND_UNKNOWN = M("COMMAND_UNKNOWN")
++CONFIGURED_RESOURCE_MISSING_IN_STATUS = M(
++    "CONFIGURED_RESOURCE_MISSING_IN_STATUS"
++)
+ LIVE_ENVIRONMENT_NOT_CONSISTENT = M("LIVE_ENVIRONMENT_NOT_CONSISTENT")
+ LIVE_ENVIRONMENT_REQUIRED = M("LIVE_ENVIRONMENT_REQUIRED")
+ LIVE_ENVIRONMENT_REQUIRED_FOR_LOCAL_NODE = M(
+diff --git a/pcs/common/reports/messages.py b/pcs/common/reports/messages.py
+index 0809c91d1..bfa4e9750 100644
+--- a/pcs/common/reports/messages.py
++++ b/pcs/common/reports/messages.py
+@@ -31,6 +31,7 @@ from pcs.common.resource_agent.dto import (
+     ResourceAgentNameDto,
+     get_resource_agent_full_name,
+ )
++from pcs.common.resource_status import ResourceState
+ from pcs.common.str_tools import (
+     format_list,
+     format_list_custom_last_separator,
+@@ -6442,6 +6443,35 @@ class CannotStopResourcesBeforeDeleting(ReportItemMessage):
+         )
+ 
+ 
++@dataclass(frozen=True)
++class ConfiguredResourceMissingInStatus(ReportItemMessage):
++    """
++    Cannot check status of resource, because the resource is missing in cluster
++    status despite being configured in CIB. This happens for misconfigured
++    resources, e.g. bundle with primitive resource inside and no IP address
++    for the bundle specified.
++
++    resource_id -- id of the resource
++    checked_state -- expected state of the resource
++    """
++
++    resource_id: str
++    checked_state: Optional[ResourceState] = None
++    _code = codes.CONFIGURED_RESOURCE_MISSING_IN_STATUS
++
++    @property
++    def message(self) -> str:
++        return (
++            "Cannot check if the resource '{resource_id}' is in expected "
++            "state{state}, since the resource is missing in cluster status"
++        ).format(
++            resource_id=self.resource_id,
++            state=format_optional(
++                self.checked_state and self.checked_state.name.lower(), " ({})"
++            ),
++        )
++
++
+ @dataclass(frozen=True)
+ class ResourceBanPcmkError(ReportItemMessage):
+     """
+diff --git a/pcs/lib/cib/remove_elements.py b/pcs/lib/cib/remove_elements.py
+index 093218dac..04fbe5bf2 100644
+--- a/pcs/lib/cib/remove_elements.py
++++ b/pcs/lib/cib/remove_elements.py
+@@ -259,17 +259,27 @@ def warn_resource_unmanaged(
+         report_list.extend(parser.get_warnings())
+ 
+         status = ResourcesStatusFacade.from_resources_status_dto(status_dto)
+-        report_list.extend(
+-            reports.ReportItem.warning(
+-                reports.messages.ResourceIsUnmanaged(resource_id)
+-            )
+-            for resource_id in resource_ids
+-            if status.is_state(
+-                resource_id,
+-                None,
+-                ResourceState.UNMANAGED,
+-            )
+-        )
++        for r_id in resource_ids:
++            if not status.exists(r_id, None):
++                # Pacemaker does not put misconfigured resources into cluster
++                # status and we are unable to check state of such resources.
++                # This happens for e.g. undle with primitive resource inside and
++                # no IP address for the bundle specified. We expect the resource
++                # to be stopped since it is misconfigured. Stopping it again
++                # even when it is unmanaged should not break anything.
++                report_list.append(
++                    reports.ReportItem.debug(
++                        reports.messages.ConfiguredResourceMissingInStatus(
++                            r_id, ResourceState.UNMANAGED
++                        )
++                    )
++                )
++            elif status.is_state(r_id, None, ResourceState.UNMANAGED):
++                report_list.append(
++                    reports.ReportItem.warning(
++                        reports.messages.ResourceIsUnmanaged(r_id)
++                    )
++                )
+     except NotImplementedError:
+         # TODO remove when issue with bundles in status is fixed
+         report_list.extend(
+@@ -318,20 +328,31 @@ def ensure_resources_stopped(
+         report_list.extend(parser.get_warnings())
+ 
+         status = ResourcesStatusFacade.from_resources_status_dto(status_dto)
+-        not_stopped_ids = [
+-            resource_id
+-            for resource_id in resource_ids
+-            if not status.is_state(
+-                resource_id,
++        for r_id in resource_ids:
++            if not status.exists(r_id, None):
++                # Pacemaker does not put misconfigured resources into cluster
++                # status and we are unable to check state of such resources.
++                # This happens for e.g. undle with primitive resource inside and
++                # no IP address for the bundle specified. We expect the resource
++                # to be stopped since it is misconfigured.
++                report_list.append(
++                    reports.ReportItem.debug(
++                        reports.messages.ConfiguredResourceMissingInStatus(
++                            r_id, ResourceState.STOPPED
++                        )
++                    )
++                )
++            elif not status.is_state(
++                r_id,
+                 None,
+                 ResourceState.STOPPED,
+                 instances_quantifier=(
+                     MoreChildrenQuantifierType.ALL
+-                    if status.can_have_multiple_instances(resource_id)
++                    if status.can_have_multiple_instances(r_id)
+                     else None
+                 ),
+-            )
+-        ]
++            ):
++                not_stopped_ids.append(r_id)
+     except NotImplementedError:
+         # TODO remove when issue with bundles in status is fixed
+         not_stopped_ids = [
+diff --git a/pcs_test/tier0/common/reports/test_messages.py b/pcs_test/tier0/common/reports/test_messages.py
+index e9f47786d..305644449 100644
+--- a/pcs_test/tier0/common/reports/test_messages.py
++++ b/pcs_test/tier0/common/reports/test_messages.py
+@@ -11,6 +11,7 @@ from pcs.common.file import RawFileError
+ from pcs.common.reports import const
+ from pcs.common.reports import messages as reports
+ from pcs.common.resource_agent.dto import ResourceAgentNameDto
++from pcs.common.resource_status import ResourceState
+ from pcs.common.types import CibRuleExpressionType
+ 
+ # pylint: disable=too-many-lines
+@@ -6075,3 +6076,25 @@ class GuestNodeRemovalIncomplete(NameBuildTest):
+             ),
+             reports.GuestNodeRemovalIncomplete("guest-node"),
+         )
++
++
++class ConfiguredResourceMissingInStatus(NameBuildTest):
++    def test_only_resource_id(self):
++        self.assert_message_from_report(
++            (
++                "Cannot check if the resource 'id' is in expected state, "
++                "since the resource is missing in cluster status"
++            ),
++            reports.ConfiguredResourceMissingInStatus("id"),
++        )
++
++    def test_with_expected_state(self):
++        self.assert_message_from_report(
++            (
++                "Cannot check if the resource 'id' is in expected state "
++                "(stopped), since the resource is missing in cluster status"
++            ),
++            reports.ConfiguredResourceMissingInStatus(
++                "id", ResourceState.STOPPED
++            ),
++        )
+diff --git a/pcs_test/tier0/lib/commands/test_cib.py b/pcs_test/tier0/lib/commands/test_cib.py
+index 7c72fd047..a6d68ae36 100644
+--- a/pcs_test/tier0/lib/commands/test_cib.py
++++ b/pcs_test/tier0/lib/commands/test_cib.py
+@@ -5,6 +5,7 @@ from unittest import (
+ )
+ 
+ from pcs.common import reports
++from pcs.common.resource_status import ResourceState
+ from pcs.lib.commands import cib as lib
+ 
+ from pcs_test.tools import fixture
+@@ -991,3 +992,68 @@ class RemoveElementsStopResources(TestCase, StopResourcesWaitMixin):
+                 ),
+             ]
+         )
++
++    def test_skip_state_check_on_missing_from_status(self):
++        self.config.runner.cib.load(
++            resources="""
++                <resources>
++                    <bundle id="test-bundle">
++                        <podman image="localhost/pcmktest:test"/>
++                        <primitive id="apa" class="ocf" type="apache" provider="heartbeat"/>
++                    </bundle>
++                </resources>
++            """
++        )
++        self.fixture_stop_resources_wait_calls(
++            self.config.calls.get("runner.cib.load").stdout,
++            initial_state_modifiers={"resources": "<resources/>"},
++            after_disable_cib_modifiers={
++                "resources": """
++                    <resources>
++                        <bundle id="test-bundle">
++                            <podman image="localhost/pcmktest:test"/>
++                            <primitive id="apa" class="ocf" type="apache" provider="heartbeat">
++                                <meta_attributes id="apa-meta_attributes">
++                                    <nvpair id="apa-meta_attributes-target-role" name="target-role" value="Stopped"/>
++                                </meta_attributes>
++                            </primitive>
++                        </bundle>
++                    </resources>
++                """
++            },
++            after_disable_state_modifiers={"resources": "<resources/>"},
++        )
++        self.fixture_push_cib_after_stopping(
++            resources="""
++                <resources>
++                    <bundle id="test-bundle">
++                        <podman image="localhost/pcmktest:test"/>
++                    </bundle>
++                </resources>
++            """
++        )
++        lib.remove_elements(self.env_assist.get_env(), ["apa"])
++        self.env_assist.assert_reports(
++            [
++                fixture.info(
++                    reports.codes.STOPPING_RESOURCES_BEFORE_DELETING,
++                    resource_id_list=["apa"],
++                ),
++                fixture.debug(
++                    reports.codes.CONFIGURED_RESOURCE_MISSING_IN_STATUS,
++                    resource_id="apa",
++                    checked_state=ResourceState.UNMANAGED,
++                ),
++                fixture.info(reports.codes.WAIT_FOR_IDLE_STARTED, timeout=0),
++                fixture.debug(
++                    reports.codes.CONFIGURED_RESOURCE_MISSING_IN_STATUS,
++                    resource_id="apa",
++                    checked_state=ResourceState.STOPPED,
++                ),
++                fixture.info(
++                    reports.codes.CIB_REMOVE_REFERENCES,
++                    id_tag_map={"apa": "primitive", "test-bundle": "bundle"},
++                    removing_references_from={"apa": {"test-bundle"}},
++                ),
++            ]
++        )
+-- 
+2.48.1
+

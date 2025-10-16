@@ -1,0 +1,28 @@
+From a63fcd9e4ebc5a05cf7c45499e00151cf27561dd Mon Sep 17 00:00:00 2001
+From: Miroslav Lisik <mlisik@redhat.com>
+Date: Fri, 16 May 2025 13:30:04 +0200
+Subject: [PATCH 3/3] fix tests for tornado-6.5
+
+* since tornado-6.5, the host value for HTTPServerRequest should come
+  from http header 'Host'
+* https://www.tornadoweb.org/en/stable/releases/v6.5.0.html#tornado-httputil
+* https://github.com/tornadoweb/tornado/commit/4ce700affdd23631a0514d1a0460c0854b0687fe
+---
+ pcs_test/tier0/daemon/test_ruby_pcsd.py | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/pcs_test/tier0/daemon/test_ruby_pcsd.py b/pcs_test/tier0/daemon/test_ruby_pcsd.py
+index 49b18128..2f7014b5 100644
+--- a/pcs_test/tier0/daemon/test_ruby_pcsd.py
++++ b/pcs_test/tier0/daemon/test_ruby_pcsd.py
+@@ -37,7 +37,6 @@ def create_http_request():
+         uri="/pcsd/uri",
+         headers=HTTPHeaders({"Cookie": "cookie1=first;cookie2=second"}),
+         body=str.encode(urlencode({"post-key": "post-value"})),
+-        host="pcsd-host:2224",
+     )
+ 
+ 
+-- 
+2.49.0
+

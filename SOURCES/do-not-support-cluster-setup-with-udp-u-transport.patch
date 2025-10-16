@@ -1,0 +1,38 @@
+From 071b189a3a72610361f8d31d2ebbb0b9083c872f Mon Sep 17 00:00:00 2001
+From: Ivan Devat <idevat@redhat.com>
+Date: Tue, 20 Nov 2018 15:03:56 +0100
+Subject: [PATCH] do not support cluster setup with udp(u) transport in RHEL9
+
+---
+ pcs/pcs.8.in | 2 ++
+ pcs/usage.py | 1 +
+ 2 files changed, 3 insertions(+)
+
+diff --git a/pcs/pcs.8.in b/pcs/pcs.8.in
+index 63c40b78..f69a75b8 100644
+--- a/pcs/pcs.8.in
++++ b/pcs/pcs.8.in
+@@ -479,6 +479,8 @@ By default, encryption is enabled with cipher=aes256 and hash=sha256. To disable
+ 
+ Transports udp and udpu:
+ .br
++WARNING: These transports are not supported in RHEL 9.
++.br
+ These transports are limited to one address per node. They do not support traffic encryption nor compression.
+ .br
+ Transport options are: ip_version, netmtu
+diff --git a/pcs/usage.py b/pcs/usage.py
+index a4af30d4..7c7fc7ea 100644
+--- a/pcs/usage.py
++++ b/pcs/usage.py
+@@ -1490,6 +1490,7 @@ Commands:
+             hash=sha256. To disable encryption, set cipher=none and hash=none.
+ 
+         Transports udp and udpu:
++        WARNING: These transports are not supported in RHEL 9.
+         These transports are limited to one address per node. They do not
+         support traffic encryption nor compression.
+         Transport options are:
+-- 
+2.45.2
+
