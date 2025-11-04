@@ -1,6 +1,6 @@
 Name:                 pcs
 Version:              0.10.18
-Release:              2%{?dist}.6
+Release:              2%{?dist}.7
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -39,7 +39,7 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 %global version_rubygem_nio4r 2.5.9
 %global version_rubygem_open4  1.3.4
 %global version_rubygem_puma 6.4.0
-%global version_rubygem_rack  2.2.16
+%global version_rubygem_rack  2.2.20
 %global version_rubygem_rack_protection  2.2.4
 %global version_rubygem_rack_test  2.1.0
 %global version_rubygem_rexml  3.4.1
@@ -205,31 +205,32 @@ Requires:             redhat-logos
 # needs logrotate for /etc/logrotate.d/pcsd
 Requires:             logrotate
 
-Provides:             bundled(tornado) = %{tornado_version}
-Provides:             bundled(dataclasses) = %{dataclasses_version}
-Provides:             bundled(dacite) = %{dacite_version}
-Provides:             bundled(dateutil) = %{dateutil_version}
-Provides:             bundled(backports) = %{version_rubygem_backports}
-Provides:             bundled(ethon) = %{version_rubygem_ethon}
-Provides:             bundled(ffi) = %{version_rubygem_ffi}
-Provides:             bundled(json) = %{version_rubygem_json}
-Provides:             bundled(mustermann) = %{version_rubygem_mustermann}
-Provides:             bundled(nio4r) = %{version_rubygem_nio4r}
-Provides:             bundled(open4) = %{version_rubygem_open4}
-Provides:             bundled(puma) = %{version_rubygem_puma}
-Provides:             bundled(rack) = %{version_rubygem_rack}
-Provides:             bundled(rack_protection) = %{version_rubygem_rack_protection}
-Provides:             bundled(rack_test) = %{version_rubygem_rack_test}
-Provides:             bundled(rexml) = %{version_rubygem_rexml}
-Provides:             bundled(ruby2_keywords) = %{version_rubygem_ruby2_keywords}
-Provides:             bundled(sinatra) = %{version_rubygem_sinatra}
-Provides:             bundled(tilt) = %{version_rubygem_tilt}
+Provides:             bundled(python3-tornado) = %{tornado_version}
+Provides:             bundled(python3-dataclasses) = %{dataclasses_version}
+Provides:             bundled(python3-dacite) = %{dacite_version}
+Provides:             bundled(python3-dateutil) = %{dateutil_version}
+
+Provides:             bundled(rubygem-backports) = %{version_rubygem_backports}
+Provides:             bundled(rubygem-ethon) = %{version_rubygem_ethon}
+Provides:             bundled(rubygem-ffi) = %{version_rubygem_ffi}
+Provides:             bundled(rubygem-json) = %{version_rubygem_json}
+Provides:             bundled(rubygem-mustermann) = %{version_rubygem_mustermann}
+Provides:             bundled(rubygem-nio4r) = %{version_rubygem_nio4r}
+Provides:             bundled(rubygem-open4) = %{version_rubygem_open4}
+Provides:             bundled(rubygem-puma) = %{version_rubygem_puma}
+Provides:             bundled(rubygem-rack) = %{version_rubygem_rack}
+Provides:             bundled(rubygem-rack-protection) = %{version_rubygem_rack_protection}
+Provides:             bundled(rubygem-rack-test) = %{version_rubygem_rack_test}
+Provides:             bundled(rubygem-rexml) = %{version_rubygem_rexml}
+Provides:             bundled(rubygem-ruby2_keywords) = %{version_rubygem_ruby2_keywords}
+Provides:             bundled(rubygem-sinatra) = %{version_rubygem_sinatra}
+Provides:             bundled(rubygem-tilt) = %{version_rubygem_tilt}
 
 # javascript bundled libraries for old web-ui
-Provides:             bundled(ember) = %{ember_version}
-Provides:             bundled(handlebars) = %{handlebars_version}
-Provides:             bundled(jquery) = %{jquery_version}
-Provides:             bundled(jquery-ui) = %{jquery_ui_version}
+Provides:             bundled(js-ember) = %{ember_version}
+Provides:             bundled(js-handlebars) = %{handlebars_version}
+Provides:             bundled(js-jquery) = %{jquery_version}
+Provides:             bundled(js-jquery-ui) = %{jquery_ui_version}
 
 %description
 pcs is a corosync and pacemaker configuration tool.  It permits users to
@@ -252,7 +253,7 @@ Requires:             pcs = %{version}-%{release}
 Requires:             pacemaker
 Requires:             net-snmp
 
-Provides:             bundled(pyagentx) = %{pyagentx_version}
+Provides:             bundled(python3-pyagentx) = %{pyagentx_version}
 
 %description -n %{pcs_snmp_pkg_name}
 SNMP agent that provides information about pacemaker cluster to the master agent (snmpd)
@@ -564,8 +565,12 @@ remove_all_tests
 %license pyagentx_LICENSE.txt
 
 %changelog
-* Fri Oct 10 2025 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
+* Tue Nov 04 2025 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
 - Debrand PCS
+
+* Wed Oct 22 2025 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.7
+- Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
+  Resolves: RHEL-120432, RHEL-120939, RHEL-121033, RHEL-123639, RHEL-124936
 
 * Mon Jun 23 2025 Michal Pospisil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.6
 - Fixed CVE-2024-49761 by updating rubygem rexml
