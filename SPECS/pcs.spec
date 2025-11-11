@@ -1,6 +1,6 @@
 Name: pcs
 Version: 0.11.10
-Release: 1%{?dist}
+Release: 1%{?dist}.1
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -56,7 +56,7 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 %global version_rubygem_mustermann  3.0.3
 %global version_rubygem_nio4r 2.7.4
 %global version_rubygem_puma 6.6.0
-%global version_rubygem_rack 3.1.16
+%global version_rubygem_rack 3.2.3
 %global version_rubygem_rack_protection  4.1.1
 %global version_rubygem_rack_session 2.1.1
 %global version_rubygem_rack_test  2.2.0
@@ -219,24 +219,26 @@ Requires: logrotate
 # for working with qdevice certificates (certutil)
 Requires: nss-tools
 
-Provides: bundled(dacite) = %{dacite_version}
-Provides: bundled(backports) = %{version_rubygem_backports}
-Provides: bundled(base64) = %{version_rubygem_base64}
-Provides: bundled(childprocess) = %{version_rubygem_childprocess}
-Provides: bundled(ethon) = %{version_rubygem_ethon}
-Provides: bundled(ffi) = %{version_rubygem_ffi}
-Provides: bundled(logger) = %{version_rubygem_logger}
-Provides: bundled(mustermann) = %{version_rubygem_mustermann}
-Provides: bundled(nio4r) = %{version_rubygem_nio4r}
-Provides: bundled(puma) = %{version_rubygem_puma}
-Provides: bundled(rack) = %{version_rubygem_rack}
-Provides: bundled(rack_protection) = %{version_rubygem_rack_protection}
-Provides: bundled(rack_session) = %{version_rubygem_rack_session}
-Provides: bundled(rack_test) = %{version_rubygem_rack_test}
-Provides: bundled(rackup) = %{version_rubygem_rackup}
-Provides: bundled(ruby2_keywords) = %{version_rubygem_ruby2_keywords}
-Provides: bundled(sinatra) = %{version_rubygem_sinatra}
-Provides: bundled(tilt) = %{version_rubygem_tilt}
+
+Provides: bundled(python3-dacite) = %{dacite_version}
+
+Provides: bundled(rubygem-backports) = %{version_rubygem_backports}
+Provides: bundled(rubygem-base64) = %{version_rubygem_base64}
+Provides: bundled(rubygem-childprocess) = %{version_rubygem_childprocess}
+Provides: bundled(rubygem-ethon) = %{version_rubygem_ethon}
+Provides: bundled(rubygem-ffi) = %{version_rubygem_ffi}
+Provides: bundled(rubygem-logger) = %{version_rubygem_logger}
+Provides: bundled(rubygem-mustermann) = %{version_rubygem_mustermann}
+Provides: bundled(rubygem-nio4r) = %{version_rubygem_nio4r}
+Provides: bundled(rubygem-puma) = %{version_rubygem_puma}
+Provides: bundled(rubygem-rack) = %{version_rubygem_rack}
+Provides: bundled(rubygem-rack-protection) = %{version_rubygem_rack_protection}
+Provides: bundled(rubygem-rack-session) = %{version_rubygem_rack_session}
+Provides: bundled(rubygem-rack-test) = %{version_rubygem_rack_test}
+Provides: bundled(rubygem-rackup) = %{version_rubygem_rackup}
+Provides: bundled(rubygem-ruby2_keywords) = %{version_rubygem_ruby2_keywords}
+Provides: bundled(rubygem-sinatra) = %{version_rubygem_sinatra}
+Provides: bundled(rubygem-tilt) = %{version_rubygem_tilt}
 
 Provides: bundled(pcs-web-ui) = %{!?ui_tarball_version:%{ui_version}}%{?ui_tarball_version}
 
@@ -262,7 +264,7 @@ Requires: pcs = %{version}-%{release}
 Requires: pacemaker
 Requires: net-snmp
 
-Provides: bundled(pyagentx) = %{pyagentx_version}
+Provides: bundled(python3-pyagentx) = %{pyagentx_version}
 
 %description -n %{pcs_snmp_pkg_name}
 SNMP agent that provides information about pacemaker cluster to the master agent (snmpd)
@@ -623,6 +625,10 @@ run_all_tests
 
 
 %changelog
+* Thu Oct 23 2025 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.1
+- Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
+  Resolves: RHEL-120945, RHEL-121035, RHEL-123630, RHEL-123642, RHEL-124938
+
 * Wed Jul 9 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.10-1
 - Rebased pcs to the latest sources (see CHANGELOG.md)
   Resolves: RHEL-77194, RHEL-92044
