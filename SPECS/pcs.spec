@@ -1,6 +1,6 @@
 Name: pcs
-Version: 0.11.9
-Release: 2%{?dist}.2
+Version: 0.11.10
+Release: 1%{?dist}
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -19,50 +19,54 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs release, comment out branch_or_commit
 # Use long commit hash or branch name to build an unreleased version
-# %%global branch_or_commit 73c3ba7aec1e2abf2ef7c3d0ffddeeef7c7516d0
+# %%global branch_or_commit dbb53b89e16735d4edf85248d02024bb6de53a55
+
+%global version_or_commit %{version}
 %if 0%{?branch_or_commit:1}
   %global version_or_commit %{branch_or_commit}
-%else
-  %global version_or_commit %{version}
+  %global tarball_version %{version}+%(echo %{branch_or_commit} | head -c 8)
 %endif
 %global pcs_source_name %{name}-%{version_or_commit}
 
 # To build an official pcs-web-ui release, comment out ui_branch_or_commit
 # Last tagged version, also used as fallback version for untagged tarballs
-%global ui_version 0.1.22
+%global ui_version 0.1.23
 # Use long commit hash or branch name to build an unreleased version
-# %%global ui_branch_or_commit 34372d1268f065ed186546f55216aaa2d7e76b54
+# %%global ui_branch_or_commit 54730df523389a3c87abad7e47c44e30b33a2647
+%global ui_modules_version 0.1.23
+
+%global ui_version_or_commit %{ui_version}
 %if 0%{?ui_branch_or_commit:1}
   %global ui_version_or_commit %{ui_branch_or_commit}
-%else
-  %global ui_version_or_commit %{ui_version}
+  %global ui_tarball_version %{ui_version}-%(echo %{ui_branch_or_commit} | head -c 8)
 %endif
 %global ui_src_name pcs-web-ui-%{ui_version_or_commit}
 
-%global ui_modules_version 0.1.22
 
 %global pcs_snmp_pkg_name  pcs-snmp
 
 %global pyagentx_version   0.4.pcs.2
-%global dacite_version  1.8.1
-%global version_rubygem_backports  3.25.0
+%global dacite_version  1.9.2
+%global version_rubygem_backports  3.25.1
 %global version_rubygem_base64 0.2.0
-%global version_rubygem_childprocess  5.0.0
+%global version_rubygem_childprocess  5.1.0
 %global version_rubygem_ethon  0.16.0
-%global version_rubygem_ffi  1.17.0
+%global version_rubygem_ffi  1.17.2
+%global version_rubygem_logger 1.7.0
 %global version_rubygem_mustermann  3.0.3
 %global version_rubygem_nio4r 2.7.4
-%global version_rubygem_puma 6.4.3
-%global version_rubygem_rack 3.2.3
-%global version_rubygem_rack_protection  4.0.0
-%global version_rubygem_rack_session 2.0.0
-%global version_rubygem_rack_test  2.1.0
+%global version_rubygem_puma 6.6.0
+%global version_rubygem_rack 3.1.16
+%global version_rubygem_rack_protection  4.1.1
+%global version_rubygem_rack_session 2.1.1
+%global version_rubygem_rack_test  2.2.0
 %global version_rubygem_rackup 2.2.1
 %global version_rubygem_ruby2_keywords  0.0.5
-%global version_rubygem_sinatra  4.0.0
-%global version_rubygem_tilt  2.4.0
+%global version_rubygem_sinatra  4.1.1
+%global version_rubygem_tilt  2.6.0
 
-%global required_pacemaker_version 2.1.0
+%global min_compatible_pacemaker_version 2.1.0
+%global first_incompatible_pacemaker_version 3.0.0
 
 %global pcs_bundled_dir pcs_bundled
 %global pcsd_public_dir pcsd/public
@@ -103,6 +107,7 @@ Source93: https://rubygems.org/downloads/ruby2_keywords-%{version_rubygem_ruby2_
 Source94: https://rubygems.org/downloads/base64-%{version_rubygem_base64}.gem
 Source95: https://rubygems.org/downloads/rack-session-%{version_rubygem_rack_session}.gem
 Source96: https://rubygems.org/downloads/rackup-%{version_rubygem_rackup}.gem
+Source97: https://rubygems.org/downloads/logger-%{version_rubygem_logger}.gem
 
 Source100: https://github.com/ClusterLabs/pcs-web-ui/archive/%{ui_version_or_commit}/%{ui_src_name}.tar.gz
 Source101: https://github.com/ClusterLabs/pcs-web-ui/releases/download/%{ui_version_or_commit}/pcs-web-ui-node-modules-%{ui_modules_version}.tar.xz
@@ -110,15 +115,9 @@ Source101: https://github.com/ClusterLabs/pcs-web-ui/releases/download/%{ui_vers
 # pcs patches: <= 200
 # Patch1: bzNUMBER-01-name.patch
 Patch1: do-not-support-cluster-setup-with-udp-u-transport.patch
-Patch2: RHEL-79055-fix-restarting-bundle-instances.patch
-Patch3: RHEL-79160-fix-deletion-of-misconfigured-bundles.patch
-Patch4: RHEL-90153-01-support-for-query-limits-in-rack.patch
-Patch5: RHEL-92551-01-ignore-case-of-target-role-in-cluster-status.patch
-Patch6: fix-tests-for-tornado-6.5.patch
 
 # ui patches: >200
 # Patch201: bzNUMBER-01-name.patch
-Patch201: RHEL-78653-fix-filter-clones-by-agent-name-in-resource-tree.patch
 
 
 # git for patches
@@ -128,7 +127,6 @@ BuildRequires: coreutils
 # find is used in Makefile and also somewhere else
 BuildRequires: findutils
 # python for pcs
-BuildRequires: python3 >= 3.9
 BuildRequires: python3-cryptography
 BuildRequires: python3-dateutil >= 2.7.0
 BuildRequires: python3-devel
@@ -136,7 +134,6 @@ BuildRequires: python3-setuptools
 BuildRequires: python3-pycurl
 BuildRequires: python3-pip
 BuildRequires: python3-pyparsing
-BuildRequires: python3-cryptography
 BuildRequires: python3-lxml
 # for building bundled python packages
 BuildRequires: python3-wheel
@@ -146,6 +143,8 @@ BuildRequires: python3-tornado
 # gcc for compiling custom rubygems
 BuildRequires: gcc
 BuildRequires: gcc-c++
+# for rubygem ffi
+BuildRequires: libffi-devel
 # ruby and gems for pcsd
 BuildRequires: ruby >= 2.5
 BuildRequires: ruby-devel
@@ -170,8 +169,10 @@ BuildRequires: npm
 # cluster stack packages for pkg-config
 BuildRequires: booth
 BuildRequires: corosynclib-devel >= 3.0
+# Buildroot only package, provides pkgconfig of corosync-qdevice for autotools
+BuildRequires: corosync-qdevice-devel
 BuildRequires: fence-agents-common
-BuildRequires: pacemaker-libs-devel >= %{required_pacemaker_version}
+BuildRequires: pacemaker-libs-devel >= %{min_compatible_pacemaker_version}, pacemaker-libs-devel < %{first_incompatible_pacemaker_version}
 BuildRequires: resource-agents
 BuildRequires: sbd
 # for working with qdevice certificates (certutil) - used in configure.ac
@@ -198,12 +199,12 @@ Requires: rubygem-rexml
 # for killall
 Requires: psmisc
 # cluster stack and related packages
-Requires: pcmk-cluster-manager >= %{required_pacemaker_version}
-Suggests: pacemaker >= %{required_pacemaker_version}
+Requires: pcmk-cluster-manager >= %{min_compatible_pacemaker_version}, pcmk-cluster-manager < %{first_incompatible_pacemaker_version}
+Suggests: pacemaker >= %{min_compatible_pacemaker_version}, pacemaker < %{first_incompatible_pacemaker_version}
 Requires: (corosync >= 3.0 if pacemaker)
 # pcs enables corosync encryption by default so we require libknet1-plugins-all
 Requires: (libknet1-plugins-all if corosync)
-Requires: pacemaker-cli >= %{required_pacemaker_version}
+Requires: pacemaker-cli >= %{min_compatible_pacemaker_version}, pacemaker-cli < %{first_incompatible_pacemaker_version}
 # for post, preun and postun macros
 Requires(post): systemd
 Requires(preun): systemd
@@ -218,25 +219,27 @@ Requires: logrotate
 # for working with qdevice certificates (certutil)
 Requires: nss-tools
 
+Provides: bundled(dacite) = %{dacite_version}
+Provides: bundled(backports) = %{version_rubygem_backports}
+Provides: bundled(base64) = %{version_rubygem_base64}
+Provides: bundled(childprocess) = %{version_rubygem_childprocess}
+Provides: bundled(ethon) = %{version_rubygem_ethon}
+Provides: bundled(ffi) = %{version_rubygem_ffi}
+Provides: bundled(logger) = %{version_rubygem_logger}
+Provides: bundled(mustermann) = %{version_rubygem_mustermann}
+Provides: bundled(nio4r) = %{version_rubygem_nio4r}
+Provides: bundled(puma) = %{version_rubygem_puma}
+Provides: bundled(rack) = %{version_rubygem_rack}
+Provides: bundled(rack_protection) = %{version_rubygem_rack_protection}
+Provides: bundled(rack_session) = %{version_rubygem_rack_session}
+Provides: bundled(rack_test) = %{version_rubygem_rack_test}
+Provides: bundled(rackup) = %{version_rubygem_rackup}
+Provides: bundled(ruby2_keywords) = %{version_rubygem_ruby2_keywords}
+Provides: bundled(sinatra) = %{version_rubygem_sinatra}
+Provides: bundled(tilt) = %{version_rubygem_tilt}
 
-Provides: bundled(python3-dacite) = %{dacite_version}
+Provides: bundled(pcs-web-ui) = %{!?ui_tarball_version:%{ui_version}}%{?ui_tarball_version}
 
-Provides: bundled(rubygem-backports) = %{version_rubygem_backports}
-Provides: bundled(rubygem-base64) = %{version_rubygem_base64}
-Provides: bundled(rubygem-childprocess) = %{version_rubygem_childprocess}
-Provides: bundled(rubygem-ethon) = %{version_rubygem_ethon}
-Provides: bundled(rubygem-ffi) = %{version_rubygem_ffi}
-Provides: bundled(rubygem-mustermann) = %{version_rubygem_mustermann}
-Provides: bundled(rubygem-nio4r) = %{version_rubygem_nio4r}
-Provides: bundled(rubygem-puma) = %{version_rubygem_puma}
-Provides: bundled(rubygem-rack) = %{version_rubygem_rack}
-Provides: bundled(rubygem-rack-protection) = %{version_rubygem_rack_protection}
-Provides: bundled(rubygem-rack-session) = %{version_rubygem_rack_session}
-Provides: bundled(rubygem-rack-test) = %{version_rubygem_rack_test}
-Provides: bundled(rubygem-rackup) = %{version_rubygem_rackup}
-Provides: bundled(rubygem-ruby2_keywords) = %{version_rubygem_ruby2_keywords}
-Provides: bundled(rubygem-sinatra) = %{version_rubygem_sinatra}
-Provides: bundled(rubygem-tilt) = %{version_rubygem_tilt}
 
 %description
 pcs is a corosync and pacemaker configuration tool.  It permits users to
@@ -259,7 +262,7 @@ Requires: pcs = %{version}-%{release}
 Requires: pacemaker
 Requires: net-snmp
 
-Provides: bundled(python3-pyagentx) = %{pyagentx_version}
+Provides: bundled(pyagentx) = %{pyagentx_version}
 
 %description -n %{pcs_snmp_pkg_name}
 SNMP agent that provides information about pacemaker cluster to the master agent (snmpd)
@@ -319,31 +322,24 @@ update_times_patch(){
 # 3. then unpack node_modules into sources tree (-a 1).
 %autosetup -T -b 100 -a 101 -N -n %{ui_src_name}
 %autopatch -p1 -m 201
-
-
 # update_times_patch %%{PATCH201}
-update_times_patch %{PATCH201}
 
 # patch pcs sources
 %autosetup -S git -n %{pcs_source_name} -N
 %autopatch -p1 -M 200
 # update_times_patch %%{PATCH1}
 update_times_patch %{PATCH1}
-update_times_patch %{PATCH2}
-update_times_patch %{PATCH3}
-update_times_patch %{PATCH4}
-update_times_patch %{PATCH5}
-update_times_patch %{PATCH6}
+
 
 # generate .tarball-version if building from an untagged commit, not a released version
 # autogen uses git-version-gen which uses .tarball-version for generating version number
-%if "%{version}" != "%{version_or_commit}"
-  echo "%version+$(echo "%{version_or_commit}" | head -c 8)" > %{_builddir}/%{pcs_source_name}/.tarball-version
+%if 0%{?tarball_version:1}
+  echo %{tarball_version} > %{_builddir}/%{pcs_source_name}/.tarball-version
 %endif
 
 
-%if "x%{?ui_branch_or_commit}" != "x"
-  echo "%{ui_version}+$(echo "%{ui_branch_or_commit}" | head -c 8)" > %{_builddir}/%{ui_src_name}/.tarball-version
+%if 0%{?ui_tarball_version:1}
+  echo %{ui_tarball_version} > %{_builddir}/%{ui_src_name}/.tarball-version
 %endif
 
 # prepare dirs/files necessary for building all bundles
@@ -367,6 +363,7 @@ cp -f %SOURCE93 %{rubygem_cache_dir}
 cp -f %SOURCE94 %{rubygem_cache_dir}
 cp -f %SOURCE95 %{rubygem_cache_dir}
 cp -f %SOURCE96 %{rubygem_cache_dir}
+cp -f %SOURCE97 %{rubygem_cache_dir}
 
 
 # 2) prepare python bundles
@@ -406,6 +403,15 @@ cd ../%{ui_src_name}
 mkdir -p %{buildroot}%{_libdir}/%{pcsd_public_dir}/ui/static/media
 ln -fs /etc/favicon.png %{buildroot}%{_libdir}/%{pcsd_public_dir}/ui/static/media/favicon.png
 
+# prepare pcs-web-ui files (not needed for pcs as pcs installs them in Makefile)
+mkdir -p %{buildroot}/%{_defaultlicensedir}/%{name}
+mv COPYING %{buildroot}/%{_defaultlicensedir}/%{name}/COPYING_WUI.md
+
+mkdir -p %{buildroot}/%{_docdir}/%{name}
+mv CHANGELOG.md %{buildroot}/%{_docdir}/%{name}/CHANGELOG_WUI.md
+mv README.md %{buildroot}/%{_docdir}/%{name}/README_WUI.md
+
+
 # Install pcs
 cd ../%{pcs_source_name}
 %make_install
@@ -422,6 +428,8 @@ mv %{rubygem_bundle_dir}/gems/ethon-%{version_rubygem_ethon}/LICENSE ethon_LICEN
 mv %{rubygem_bundle_dir}/gems/ffi-%{version_rubygem_ffi}/COPYING ffi_COPYING
 mv %{rubygem_bundle_dir}/gems/ffi-%{version_rubygem_ffi}/LICENSE ffi_LICENSE
 mv %{rubygem_bundle_dir}/gems/ffi-%{version_rubygem_ffi}/LICENSE.SPECS ffi_LICENSE.SPECS
+mv %{rubygem_bundle_dir}/gems/logger-%{version_rubygem_logger}/BSDL logger_BSDL
+mv %{rubygem_bundle_dir}/gems/logger-%{version_rubygem_logger}/COPYING logger_COPYING
 mv %{rubygem_bundle_dir}/gems/mustermann-%{version_rubygem_mustermann}/LICENSE mustermann_LICENSE
 mv %{rubygem_bundle_dir}/gems/nio4r-%{version_rubygem_nio4r}/license.md nio4r_license.md
 mv %{rubygem_bundle_dir}/gems/nio4r-%{version_rubygem_nio4r}/ext/libev/LICENSE nio4r_libev_LICENSE
@@ -545,9 +553,12 @@ run_all_tests
 %files
 %doc CHANGELOG.md
 %doc README.md
+%doc %{_docdir}/%{name}/CHANGELOG_WUI.md
+%doc %{_docdir}/%{name}/README_WUI.md
 %doc dacite_README.md
 %license dacite_LICENSE
 %license COPYING
+%license %{_defaultlicensedir}/%{name}/COPYING_WUI.md
 # rubygem licenses
 %license backports_LICENSE.txt
 %license base64_LICENSE.txt
@@ -556,6 +567,8 @@ run_all_tests
 %license ffi_COPYING
 %license ffi_LICENSE
 %license ffi_LICENSE.SPECS
+%license logger_BSDL
+%license logger_COPYING
 %license mustermann_LICENSE
 %license nio4r_license.md
 %license nio4r_libev_LICENSE
@@ -577,9 +590,9 @@ run_all_tests
 %{_unitdir}/pcsd.service
 %{_unitdir}/pcsd-ruby.service
 %{_datadir}/bash-completion/completions/pcs
-%{_sharedstatedir}/pcsd
+%ghost %attr(0700,root,root) %{_sharedstatedir}/pcsd
+%ghost %attr(0700,root,root) %{_var}/log/pcsd
 %config(noreplace) %{_sysconfdir}/pam.d/pcsd
-%dir %{_var}/log/pcsd
 %config(noreplace) %{_sysconfdir}/logrotate.d/pcsd
 %config(noreplace) %{_sysconfdir}/sysconfig/pcsd
 %ghost %config(noreplace) %attr(0600,root,root) %{_sharedstatedir}/pcsd/cfgsync_ctl
@@ -588,7 +601,7 @@ run_all_tests
 %ghost %config(noreplace) %attr(0600,root,root) %{_sharedstatedir}/pcsd/pcsd.crt
 %ghost %config(noreplace) %attr(0600,root,root) %{_sharedstatedir}/pcsd/pcsd.key
 %ghost %config(noreplace) %attr(0644,root,root) %{_sharedstatedir}/pcsd/pcs_settings.conf
-%ghost %config(noreplace) %attr(0644,root,root) %{_sharedstatedir}/pcsd/pcs_users.conf
+%ghost %config(noreplace) %attr(0600,root,root) %{_sharedstatedir}/pcsd/pcs_users.conf
 %{_mandir}/man8/pcs.*
 %{_mandir}/man8/pcsd.*
 %exclude %{_libdir}/pcs/pcs_snmp_agent
@@ -608,16 +621,29 @@ run_all_tests
 %license COPYING
 %license pyagentx_LICENSE.txt
 
-%changelog
-* Fri Oct 24 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.9-2%{?dist}.2
-- Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
-  Resolves: RHEL-120943, RHEL-121036, RHEL-123631, RHEL-123644, RHEL-124942
 
-* Mon May 26 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.9-2%{?dist}.1
-- Fixed CVE-2025-46727 by updating bundled rubygem rack
-  Resolves: RHEL-90153
-- Fixed a regression in resource/stonith delete, booth delete, status query resource and remote node removal commands which failed when target-role was improperly capitalized
-  Resolves: RHEL-92551
+%changelog
+* Wed Jul 9 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.10-1
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-77194, RHEL-92044
+- Updated pcs-web-ui to 0.1.23 (see CHANGELOG_WUI.md)
+  Resolves: RHEL-76309, RHEL-99805
+- There is now a changelog for the pcsd web UI
+  Resolves: RHEL-86233
+- Fixed directory permissions for RHEL Image Mode
+  Resolves: RHEL-97220
+- Updated bundled rubygem rack
+
+* Wed May 14 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.9-3
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-35420, RHEL-76055, RHEL-76059, RHEL-76060, RHEL-76153, RHEL-76154, RHEL-76170, RHEL-76177, RHEL-82894
+- Rebased pcs-web-ui to the latest sources
+  Resolves: RHEL-76310, RHEL-76311, RHEL-76312, RHEL-79317, RHEL-85196, RHEL-85197, RHEL-85745
+- The upstream version of pcs-web-ui can now be queried through RPM - see bundled(pcs-web-ui)
+  Resolves: RHEL-86229
+- Updated bundled rubygems: backports, childprocess, ffi, puma, rack, rack-protection, rack-session, rack-test, sinatra, tilt
+  Resolves: RHEL-90151
+- Bundled rubygem logger
 
 * Fri Feb 14 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.9-2
 - Fixed restarting bundles
