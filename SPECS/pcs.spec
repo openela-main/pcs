@@ -1,6 +1,6 @@
 Name:                 pcs
 Version:              0.10.18
-Release:              2%{?dist}.7
+Release:              2%{?dist}.8
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -55,7 +55,7 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 
 # DO NOT UPDATE
 # Tornado 6.2 requires Python 3.7+
-%global tornado_version    6.1.0.pcs.2
+%global tornado_version    6.1.0.pcs.3
 
 %global pcs_bundled_dir pcs_bundled
 %global pcsd_public_dir pcsd/public
@@ -87,7 +87,7 @@ Source0:              %{url}/archive/%{?v_prefix}%{version_or_commit}/%{pcs_sour
 Source1:              HAM-logo.png
 
 Source41:             https://github.com/ondrejmular/pyagentx/archive/v%{pyagentx_version}/pyagentx-%{pyagentx_version}.tar.gz
-Source42:             https://github.com/CtrlZmaster/tornado/archive/v%{tornado_version}/tornado-%{tornado_version}.tar.gz
+Source42:             tornado-v%{tornado_version}.tar.gz
 Source43:             https://github.com/ericvsmith/dataclasses/archive/%{dataclasses_version}/dataclasses-%{dataclasses_version}.tar.gz
 Source44:             https://github.com/konradhalas/dacite/archive/v%{dacite_version}/dacite-%{dacite_version}.tar.gz
 Source45:             https://pypi.python.org/packages/source/p/python-dateutil/python-dateutil-%{dateutil_version}.tar.gz
@@ -565,8 +565,12 @@ remove_all_tests
 %license pyagentx_LICENSE.txt
 
 %changelog
-* Tue Nov 04 2025 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
+* Wed Jan 21 2026 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
 - Debrand PCS
+
+* Mon Jan 19 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.8
+- Fixed CVE-2025-67725, CVE-2025-67726 by patching bundled Tornado
+  Resolves: RHEL-136415, RHEL-136420
 
 * Wed Oct 22 2025 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.7
 - Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
