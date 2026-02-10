@@ -1,6 +1,6 @@
 Name: pcs
 Version: 0.11.10
-Release: 1%{?dist}.1
+Release: 1%{?dist}.2
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -30,10 +30,10 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs-web-ui release, comment out ui_branch_or_commit
 # Last tagged version, also used as fallback version for untagged tarballs
-%global ui_version 0.1.23
+%global ui_version 0.1.23.1
 # Use long commit hash or branch name to build an unreleased version
 # %%global ui_branch_or_commit 54730df523389a3c87abad7e47c44e30b33a2647
-%global ui_modules_version 0.1.23
+%global ui_modules_version 0.1.23.1
 
 %global ui_version_or_commit %{ui_version}
 %if 0%{?ui_branch_or_commit:1}
@@ -625,6 +625,10 @@ run_all_tests
 
 
 %changelog
+* Fri Feb 6 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.2
+- Fixed CVE-2025-13465 by updating pcs-web-ui to 0.1.23.1
+  Resolves: RHEL-144292
+
 * Thu Oct 23 2025 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.1
 - Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
   Resolves: RHEL-120945, RHEL-121035, RHEL-123630, RHEL-123642, RHEL-124938
