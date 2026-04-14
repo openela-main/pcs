@@ -1,6 +1,6 @@
 Name:                 pcs
 Version:              0.10.18
-Release:              2%{?dist}.8
+Release:              2%{?dist}.9
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -55,7 +55,7 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 
 # DO NOT UPDATE
 # Tornado 6.2 requires Python 3.7+
-%global tornado_version    6.1.0.pcs.3
+%global tornado_version    6.1.0.pcs.4
 
 %global pcs_bundled_dir pcs_bundled
 %global pcsd_public_dir pcsd/public
@@ -117,6 +117,7 @@ Patch1:               do-not-support-cluster-setup-with-udp-u-transport.patch
 Patch2:               RHEL-17280-01-disable-new-webui-routes.patch
 Patch3:               RHEL-65595-stop-sending-http-headers-to-ruby-part-of-pcsd.patch
 Patch4:               RHEL-90147-support-for-query-limits-in-rack.patch
+Patch5:               RHEL-155293-01-disable-multipart-requests-in-Tornado.patch
 
 # git for patches
 BuildRequires:        git-core
@@ -309,6 +310,7 @@ update_times_patch %{PATCH1}
 update_times_patch %{PATCH2}
 update_times_patch %{PATCH3}
 update_times_patch %{PATCH4}
+update_times_patch %{PATCH5}
 
 # generate .tarball-version if building from an untagged commit, not a released version
 # autogen uses git-version-gen which uses .tarball-version for generating version number
@@ -565,8 +567,12 @@ remove_all_tests
 %license pyagentx_LICENSE.txt
 
 %changelog
-* Wed Jan 21 2026 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
+* Tue Apr 14 2026 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
 - Debrand PCS
+
+* Thu Mar 26 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.9
+- Fixed CVE-2026-31958 by patching bundled Tornado
+  Resolves: RHEL-155293
 
 * Mon Jan 19 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.8
 - Fixed CVE-2025-67725, CVE-2025-67726 by patching bundled Tornado

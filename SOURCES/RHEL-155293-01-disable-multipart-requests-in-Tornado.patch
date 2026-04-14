@@ -1,0 +1,54 @@
+From 7fc3db518798cbbd4d11028d52837d460640fb06 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Michal=20Posp=C3=AD=C5=A1il?= <mpospisi@redhat.com>
+Date: Wed, 25 Mar 2026 22:01:21 +0100
+Subject: [PATCH] disable multipart requests in Tornado
+
+Pcsd doesn't use multipart requests and recently, there have been
+vulnerabilities targeting both Rack and Tornado. Since we use Tornado as
+a proxy for our Ruby daemon, this also helps mitigate future Rack multipart
+vulnerabilities.
+
+Multipart vulnerabilities:
+https://www.cve.org/CVERecord?id=CVE-2026-31958
+https://www.cve.org/CVERecord?id=CVE-2025-61771
+https://www.cve.org/CVERecord?id=CVE-2025-61770
+---
+ pcs/daemon/run.py | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/pcs/daemon/run.py b/pcs/daemon/run.py
+index 0a6b1b211..19586b18a 100644
+--- a/pcs/daemon/run.py
++++ b/pcs/daemon/run.py
+@@ -3,6 +3,11 @@ import signal
+ import socket
+ from pathlib import Path
+ 
++from tornado.httputil import (
++    ParseBodyConfig,
++    ParseMultipartConfig,
++    set_parse_body_config,
++)
+ from tornado.ioloop import IOLoop
+ from tornado.locks import Lock
+ from tornado.web import Application
+@@ -71,6 +76,16 @@ def configure_app(
+             reload its SSL certificates). A relevant handler should get this
+             object via the method `initialize`.
+         """
++
++        # Disable multipart requests to enhance security due to recent CVEs
++        # https://www.cve.org/CVERecord?id=CVE-2026-31958
++        # https://www.cve.org/CVERecord?id=CVE-2025-61771
++        # https://www.cve.org/CVERecord?id=CVE-2025-61770
++        # https://www.tornadoweb.org/en/stable/httputil.html#tornado.httputil.set_parse_body_config
++        set_parse_body_config(
++            ParseBodyConfig(multipart=ParseMultipartConfig(enabled=False))
++        )
++
+         routes = sinatra_remote.get_routes(
+             ruby_pcsd_wrapper,
+             sync_config_lock,
+-- 
+2.53.0
+
