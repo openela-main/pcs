@@ -1,6 +1,6 @@
 Name: pcs
 Version: 0.11.11
-Release: 2%{?dist}
+Release: 2%{?dist}.1
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -30,10 +30,10 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs-web-ui release, comment out ui_branch_or_commit
 # Last tagged version, also used as fallback version for untagged tarballs
-%global ui_version 0.1.24.2
+%global ui_version 0.1.24.3
 # Use long commit hash or branch name to build an unreleased version
 # %%global ui_branch_or_commit 1dcc2142bbba73c758ab2f3d8499156780689e34
-%global ui_modules_version 0.1.24.2
+%global ui_modules_version 0.1.24.3
 
 %global ui_version_or_commit %{ui_version}
 %if 0%{?ui_branch_or_commit:1}
@@ -624,6 +624,10 @@ run_all_tests
 
 
 %changelog
+* Fri Apr 17 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-2%{?dist}.1
+- Fixed CVE-2026-4800 by updating pcs-web-ui to 0.1.24.3
+  Resolves: RHEL-164206
+
 * Tue Feb 17 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-2
 - Fixed CVE-2025-13465 by updating pcs-web-ui to 0.1.24.2
   Resolves: RHEL-144308
