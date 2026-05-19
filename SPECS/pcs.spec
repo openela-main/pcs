@@ -1,6 +1,6 @@
 Name: pcs
-Version: 0.11.10
-Release: 1%{?dist}.3
+Version: 0.11.11
+Release: 2%{?dist}
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -19,7 +19,7 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs release, comment out branch_or_commit
 # Use long commit hash or branch name to build an unreleased version
-# %%global branch_or_commit dbb53b89e16735d4edf85248d02024bb6de53a55
+# %%global branch_or_commit 4eb4cc1f9e7184021b3f5ed74752301af9fef8a5
 
 %global version_or_commit %{version}
 %if 0%{?branch_or_commit:1}
@@ -30,10 +30,10 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs-web-ui release, comment out ui_branch_or_commit
 # Last tagged version, also used as fallback version for untagged tarballs
-%global ui_version 0.1.23.2
+%global ui_version 0.1.24.2
 # Use long commit hash or branch name to build an unreleased version
-# %%global ui_branch_or_commit 54730df523389a3c87abad7e47c44e30b33a2647
-%global ui_modules_version 0.1.23.2
+# %%global ui_branch_or_commit 1dcc2142bbba73c758ab2f3d8499156780689e34
+%global ui_modules_version 0.1.24.2
 
 %global ui_version_or_commit %{ui_version}
 %if 0%{?ui_branch_or_commit:1}
@@ -47,23 +47,23 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 %global pyagentx_version   0.4.pcs.2
 %global dacite_version  1.9.2
-%global version_rubygem_backports  3.25.1
+%global version_rubygem_backports  3.25.2
 %global version_rubygem_base64 0.2.0
 %global version_rubygem_childprocess  5.1.0
-%global version_rubygem_ethon  0.16.0
+%global version_rubygem_ethon  0.18.0
 %global version_rubygem_ffi  1.17.2
 %global version_rubygem_logger 1.7.0
-%global version_rubygem_mustermann  3.0.3
-%global version_rubygem_nio4r 2.7.4
-%global version_rubygem_puma 6.6.0
-%global version_rubygem_rack 3.2.3
-%global version_rubygem_rack_protection  4.1.1
+%global version_rubygem_mustermann  3.0.4
+%global version_rubygem_nio4r 2.7.5
+%global version_rubygem_puma 7.1.0
+%global version_rubygem_rack 3.2.4
+%global version_rubygem_rack_protection  4.2.1
 %global version_rubygem_rack_session 2.1.1
 %global version_rubygem_rack_test  2.2.0
 %global version_rubygem_rackup 2.2.1
 %global version_rubygem_ruby2_keywords  0.0.5
-%global version_rubygem_sinatra  4.1.1
-%global version_rubygem_tilt  2.6.0
+%global version_rubygem_sinatra  4.2.1
+%global version_rubygem_tilt  2.6.1
 
 %global min_compatible_pacemaker_version 2.1.0
 %global first_incompatible_pacemaker_version 3.0.0
@@ -218,7 +218,6 @@ Requires: redhat-logos
 Requires: logrotate
 # for working with qdevice certificates (certutil)
 Requires: nss-tools
-
 
 Provides: bundled(python3-dacite) = %{dacite_version}
 
@@ -625,17 +624,25 @@ run_all_tests
 
 
 %changelog
-* Tue Apr 14 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.3
-- Fixed CVE-2026-4800 by updating pcs-web-ui to 0.1.23.2
-  Resolves: RHEL-164191
+* Tue Feb 17 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-2
+- Fixed CVE-2025-13465 by updating pcs-web-ui to 0.1.24.2
+  Resolves: RHEL-144308
 
-* Fri Feb 6 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.2
-- Fixed CVE-2025-13465 by updating pcs-web-ui to 0.1.23.1
-  Resolves: RHEL-144292
+* Wed Jan 7 2026 Michal Pospisil <mpospisi@redhat.com> - 0.11.11-1
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-114420
+- Updated pcs-web-ui to 0.1.24 (see CHANGELOG_WUI.md)
+  Resolves: RHEL-132572
 
-* Thu Oct 23 2025 Michal Pospíšil <mpospisi@redhat.com> - 0.11.10-1%{?dist}.1
-- Fixed CVE-2025-59830, CVE-2025-61770, CVE-2025-61771, CVE-2025-61772, CVE-2025-61919 by updating bundled rubygem rack
-  Resolves: RHEL-120945, RHEL-121035, RHEL-123630, RHEL-123642, RHEL-124938
+* Wed Nov 12 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.10-2
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-113763
+- Rebased pcs-web-ui to the latest sources (see CHANGELOG_WUI.md)
+  Resolves: RHEL-104372, RHEL-114028, RHEL-114166, RHEL-114173
+- Modified Provides for bundled components
+  Resolves: RHEL-114470
+- Updated bundled rubygems: backports, ethon, mustermann, nio4r, puma, rack, rack-protection, sinatra, tilt
+  Resolves: RHEL-120944, RHEL-121038, RHEL-123632, RHEL-123646, RHEL-124940
 
 * Wed Jul 9 2025 Michal Pospisil <mpospisi@redhat.com> - 0.11.10-1
 - Rebased pcs to the latest sources (see CHANGELOG.md)
