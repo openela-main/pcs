@@ -1,6 +1,6 @@
 Name:                 pcs
 Version:              0.10.18
-Release:              2%{?dist}.9
+Release:              2%{?dist}.10
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -55,7 +55,7 @@ ExclusiveArch:        i686 x86_64 s390x ppc64le aarch64
 
 # DO NOT UPDATE
 # Tornado 6.2 requires Python 3.7+
-%global tornado_version    6.1.0.pcs.4
+%global tornado_version    6.1.0.pcs.5
 
 %global pcs_bundled_dir pcs_bundled
 %global pcsd_public_dir pcsd/public
@@ -567,8 +567,12 @@ remove_all_tests
 %license pyagentx_LICENSE.txt
 
 %changelog
-* Tue Apr 14 2026 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
+* Mon Oct 19 2026 OpenELA Technical Steering Committee <tsc@openela.org> - 0.10.18
 - Debrand PCS
+
+* Thu Oct 8 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.10
+- Fixed CVE-2026-82397, CVE-2024-14029 by patching bundled Tornado
+  Resolves: RHEL-271884, RHEL-271929
 
 * Thu Mar 26 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.10.18-2%{?dist}.9
 - Fixed CVE-2026-31958 by patching bundled Tornado
