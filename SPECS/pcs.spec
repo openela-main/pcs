@@ -1,6 +1,6 @@
 Name: pcs
-Version: 0.11.11
-Release: 2%{?dist}.1
+Version: 0.11.12
+Release: 2%{?dist}
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/LicensingGuidelines/
 # https://fedoraproject.org/wiki/Licensing:Main?rd=Licensing#Good_Licenses
 # GPL-2.0-only: pcs
@@ -19,7 +19,7 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs release, comment out branch_or_commit
 # Use long commit hash or branch name to build an unreleased version
-# %%global branch_or_commit 4eb4cc1f9e7184021b3f5ed74752301af9fef8a5
+# %%global branch_or_commit 7686631f1f30e1088c9ef4260e9883e58a9063dc
 
 %global version_or_commit %{version}
 %if 0%{?branch_or_commit:1}
@@ -30,10 +30,10 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 # To build an official pcs-web-ui release, comment out ui_branch_or_commit
 # Last tagged version, also used as fallback version for untagged tarballs
-%global ui_version 0.1.24.3
+%global ui_version 0.1.25
 # Use long commit hash or branch name to build an unreleased version
-# %%global ui_branch_or_commit 1dcc2142bbba73c758ab2f3d8499156780689e34
-%global ui_modules_version 0.1.24.3
+# %%global ui_branch_or_commit ce49beeeb386cb9c6773e72ee8ca320f73cf8eda
+%global ui_modules_version 0.1.25
 
 %global ui_version_or_commit %{ui_version}
 %if 0%{?ui_branch_or_commit:1}
@@ -47,23 +47,23 @@ ExclusiveArch: i686 x86_64 s390x ppc64le aarch64
 
 %global pyagentx_version   0.4.pcs.2
 %global dacite_version  1.9.2
-%global version_rubygem_backports  3.25.2
 %global version_rubygem_base64 0.2.0
+%global version_rubygem_backports  3.25.3
 %global version_rubygem_childprocess  5.1.0
 %global version_rubygem_ethon  0.18.0
 %global version_rubygem_ffi  1.17.2
 %global version_rubygem_logger 1.7.0
-%global version_rubygem_mustermann  3.0.4
+%global version_rubygem_mustermann  3.1.1
 %global version_rubygem_nio4r 2.7.5
-%global version_rubygem_puma 7.1.0
-%global version_rubygem_rack 3.2.4
+%global version_rubygem_puma 8.0.1
+%global version_rubygem_rack 3.2.6
 %global version_rubygem_rack_protection  4.2.1
-%global version_rubygem_rack_session 2.1.1
+%global version_rubygem_rack_session 2.1.2
 %global version_rubygem_rack_test  2.2.0
-%global version_rubygem_rackup 2.2.1
+%global version_rubygem_rackup 2.3.1
 %global version_rubygem_ruby2_keywords  0.0.5
 %global version_rubygem_sinatra  4.2.1
-%global version_rubygem_tilt  2.6.1
+%global version_rubygem_tilt  2.7.0
 
 %global min_compatible_pacemaker_version 2.1.0
 %global first_incompatible_pacemaker_version 3.0.0
@@ -115,9 +115,11 @@ Source101: https://github.com/ClusterLabs/pcs-web-ui/releases/download/%{ui_vers
 # pcs patches: <= 200
 # Patch1: bzNUMBER-01-name.patch
 Patch1: do-not-support-cluster-setup-with-udp-u-transport.patch
+Patch2: RHEL-215405-01-fix-pcs-stonith-update-scsi-devices-command.patch
 
 # ui patches: >200
 # Patch201: bzNUMBER-01-name.patch
+Patch201: RHEL-173500-01-revert-feat-deprecate-multi-cluster-management.patch
 
 
 # git for patches
@@ -324,12 +326,14 @@ update_times_patch(){
 %autosetup -T -b 100 -a 101 -N -n %{ui_src_name}
 %autopatch -p1 -m 201
 # update_times_patch %%{PATCH201}
+update_times_patch %%{PATCH201}
 
 # patch pcs sources
 %autosetup -S git -n %{pcs_source_name} -N
 %autopatch -p1 -M 200
 # update_times_patch %%{PATCH1}
 update_times_patch %{PATCH1}
+update_times_patch %{PATCH2}
 
 
 # generate .tarball-version if building from an untagged commit, not a released version
@@ -624,9 +628,22 @@ run_all_tests
 
 
 %changelog
-* Fri Apr 17 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-2%{?dist}.1
-- Fixed CVE-2026-4800 by updating pcs-web-ui to 0.1.24.3
-  Resolves: RHEL-164206
+* Wed Aug 19 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.12-2
+- Fixed restartless update of SCSI devices
+  Resolves: RHEL-215405
+
+* Thu Jul 2 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.12-1
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-176268, RHEL-176478, RHEL-190558
+- Updated pcs-web-ui to 0.1.25 (see CHANGELOG_WUI.md)
+- Reverted showing deprecation warnings for removal of multi-cluster support in pcs-web-ui (formerly tracked as RHEL-173500)
+
+* Tue May 5 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-3
+- Rebased pcs to the latest sources (see CHANGELOG.md)
+  Resolves: RHEL-149172, RHEL-164221
+- Rebased pcs-web-ui to the latest sources (see CHANGELOG_WUI.md)
+  Resolves: RHEL-173500
+- Updated bundled rubygems: backports, mustermann, puma, rack, rack-session, rackup, tilt
 
 * Tue Feb 17 2026 Michal Pospíšil <mpospisi@redhat.com> - 0.11.11-2
 - Fixed CVE-2025-13465 by updating pcs-web-ui to 0.1.24.2

@@ -1,0 +1,480 @@
+From 68354f8f91ea74ecf90333f33e7d4789ec93efa6 Mon Sep 17 00:00:00 2001
+From: Miroslav Lisik <mlisik@redhat.com>
+Date: Thu, 11 Jun 2026 16:23:08 +0200
+Subject: [PATCH] fix `pcs stonith update-scsi-devices` command
+
+* use new cibadmin option `--update-status` when updating scsi devices
+---
+ pcs/lib/commands/stonith.py                   |  9 ++-
+ pcs/lib/env.py                                | 55 +++++++++----------
+ pcs/lib/pacemaker/live.py                     | 12 +++-
+ .../test_stonith_update_scsi_devices.py       | 27 +++++++++
+ pcs_test/tier0/lib/test_env_cib.py            | 21 +++++++
+ pcs_test/tools/command_env/config_env.py      |  8 ++-
+ .../tools/command_env/config_runner_cib.py    |  7 ++-
+ .../tools/command_env/config_runner_pcmk.py   | 15 +++++
+ pcs_test/tools/command_env/mock_push_cib.py   | 30 +++++++++-
+ 9 files changed, 146 insertions(+), 38 deletions(-)
+
+diff --git a/pcs/lib/commands/stonith.py b/pcs/lib/commands/stonith.py
+index c5c1ab4b3..15a1efd52 100644
+--- a/pcs/lib/commands/stonith.py
++++ b/pcs/lib/commands/stonith.py
+@@ -42,6 +42,7 @@ from pcs.lib.pacemaker.live import (
+     fence_history_cleanup,
+     fence_history_text,
+     fence_history_update,
++    is_cibadmin_update_status_supported,
+     is_fence_history_supported_management,
+     is_getting_resource_digest_supported,
+ )
+@@ -402,7 +403,9 @@ def _update_scsi_devices_get_element_and_devices(
+     cib -- cib element
+     stonith_id -- id of stonith resource
+     """
+-    if not is_getting_resource_digest_supported(runner):
++    if not is_getting_resource_digest_supported(
++        runner
++    ) or not is_cibadmin_update_status_supported(runner):
+         raise LibraryError(
+             ReportItem.error(
+                 reports.messages.StonithRestartlessUpdateOfScsiDevicesNotSupported()
+@@ -529,7 +532,7 @@ def update_scsi_devices(
+     _unfencing_scsi_devices(
+         env, stonith_el, current_device_list, set_device_list, force_flags
+     )
+-    env.push_cib()
++    env.push_cib(with_status=True)
+ 
+ 
+ def update_scsi_devices_add_remove(
+@@ -583,4 +586,4 @@ def update_scsi_devices_add_remove(
+     _unfencing_scsi_devices(
+         env, stonith_el, current_device_list, updated_device_set, force_flags
+     )
+-    env.push_cib()
++    env.push_cib(with_status=True)
+diff --git a/pcs/lib/env.py b/pcs/lib/env.py
+index d0cffc993..eea9e90bc 100644
+--- a/pcs/lib/env.py
++++ b/pcs/lib/env.py
+@@ -1,24 +1,11 @@
+ from logging import Logger
+-from typing import (
+-    Any,
+-    Callable,
+-    Mapping,
+-    Optional,
+-    Union,
+-    cast,
+-)
++from typing import Any, Callable, Mapping, Optional, Union, cast
+ 
+ from lxml.etree import _Element
+ 
+-from pcs.common import (
+-    file_type_codes,
+-    reports,
+-)
++from pcs.common import file_type_codes, reports
+ from pcs.common.host import PcsKnownHost
+-from pcs.common.node_communicator import (
+-    Communicator,
+-    NodeCommunicatorFactory,
+-)
++from pcs.common.node_communicator import Communicator, NodeCommunicatorFactory
+ from pcs.common.reports import ReportProcessor
+ from pcs.common.reports.item import ReportItem
+ from pcs.common.services.interfaces import ServiceManagerInterface
+@@ -31,10 +18,7 @@ from pcs.lib.communication.corosync import (
+     DistributeCorosyncConf,
+     ReloadCorosyncConf,
+ )
+-from pcs.lib.communication.tools import (
+-    run,
+-    run_and_raise,
+-)
++from pcs.lib.communication.tools import run, run_and_raise
+ from pcs.lib.corosync.config_facade import ConfigFacade as CorosyncConfigFacade
+ from pcs.lib.corosync.config_parser import (
+     verify_section as verify_corosync_section,
+@@ -245,15 +229,21 @@ class LibraryEnvironment:
+                 ReportItem.error(reports.messages.WaitForIdleNotLiveCluster())
+             )
+ 
+-    def push_cib(self, custom_cib=None, wait_timeout: int = -1) -> None:
++    def push_cib(
++        self,
++        custom_cib: Optional[_Element] = None,
++        wait_timeout: int = -1,
++        with_status: bool = False,
++    ) -> None:
+         """
+         Push previously loaded instance of CIB or a custom CIB
+ 
+-        etree custom_cib -- push a custom CIB instead of a loaded instance
++        custom_cib -- push a custom CIB instead of a loaded instance
+             (allows to push an externally provided CIB and replace the one in
+             the cluster completely)
+         wait_timeout -- wait timeout in seconds, if less than 0 wait will be
+             skipped, if 0 wait indefinitely
++        with_status -- push also status section of a CIB
+         """
+         self._ensure_wait_satisfiable(wait_timeout)
+         if custom_cib is not None:
+@@ -261,10 +251,14 @@ class LibraryEnvironment:
+                 raise AssertionError(
+                     "CIB has been loaded, cannot push custom CIB"
+                 )
++            if with_status:
++                raise AssertionError(
++                    "Cannot push status section of a custom CIB"
++                )
+             return self.__push_cib_full(custom_cib, wait_timeout)
+         if self.__loaded_cib_diff_source is None:
+             raise AssertionError("CIB has not been loaded")
+-        return self.__push_cib_diff(wait_timeout)
++        return self.__push_cib_diff(wait_timeout, with_status)
+ 
+     def __push_cib_full(self, cib_to_push, wait_timeout: int):
+         self.__do_push_cib(
+@@ -272,20 +266,23 @@ class LibraryEnvironment:
+             wait_timeout,
+         )
+ 
+-    def __push_cib_diff(self, wait_timeout: int):
++    def __push_cib_diff(self, wait_timeout: int, with_status: bool = False):
+         self.__do_push_cib(
+-            lambda: self.__main_push_cib_diff(self.cmd_runner()), wait_timeout
++            lambda: self.__main_push_cib_diff(self.cmd_runner(), with_status),
++            wait_timeout,
+         )
+ 
+-    def __main_push_cib_diff(self, cmd_runner):
++    def __main_push_cib_diff(
++        self, cmd_runner: CommandRunner, with_status: bool = False
++    ):
+         cib_diff_xml = diff_cibs_xml(
+             cmd_runner,
+             self.report_processor,
+-            self.__loaded_cib_diff_source,
+-            etree_to_str(self.__loaded_cib_to_modify),
++            cast(str, self.__loaded_cib_diff_source),
++            etree_to_str(cast(_Element, self.__loaded_cib_to_modify)),
+         )
+         if cib_diff_xml:
+-            push_cib_diff_xml(cmd_runner, cib_diff_xml)
++            push_cib_diff_xml(cmd_runner, cib_diff_xml, with_status)
+ 
+     def __do_push_cib(self, push_strategy, wait_timeout: int) -> None:
+         push_strategy()
+diff --git a/pcs/lib/pacemaker/live.py b/pcs/lib/pacemaker/live.py
+index da1154f53..97cd7da59 100644
+--- a/pcs/lib/pacemaker/live.py
++++ b/pcs/lib/pacemaker/live.py
+@@ -290,13 +290,17 @@ def replace_cib_configuration(runner: CommandRunner, tree: _Element) -> None:
+     return replace_cib_configuration_xml(runner, etree_to_str(tree))
+ 
+ 
+-def push_cib_diff_xml(runner: CommandRunner, cib_diff_xml: str) -> None:
++def push_cib_diff_xml(
++    runner: CommandRunner, cib_diff_xml: str, with_status: bool = False
++) -> None:
+     cmd = [
+         settings.cibadmin_exec,
+         "--patch",
+         "--verbose",
+         "--xml-pipe",
+     ]
++    if with_status:
++        cmd.append("--update-status")
+     stdout, stderr, retval = runner.run(cmd, stdin_string=cib_diff_xml)
+     if retval != 0:
+         raise LibraryError(
+@@ -965,6 +969,12 @@ def is_getting_resource_digest_supported(runner: CommandRunner) -> bool:
+     )
+ 
+ 
++def is_cibadmin_update_status_supported(runner: CommandRunner) -> bool:
++    return _is_in_pcmk_tool_help(
++        runner, settings.cibadmin_exec, ["--update-status"]
++    )
++
++
+ def get_resource_digests(
+     runner: CommandRunner,
+     resource_id: str,
+diff --git a/pcs_test/tier0/lib/commands/test_stonith_update_scsi_devices.py b/pcs_test/tier0/lib/commands/test_stonith_update_scsi_devices.py
+index 152b51cae..3148d6815 100644
+--- a/pcs_test/tier0/lib/commands/test_stonith_update_scsi_devices.py
++++ b/pcs_test/tier0/lib/commands/test_stonith_update_scsi_devices.py
+@@ -417,6 +417,7 @@ class UpdateScsiDevicesMixin:
+             ),
+         )
+         self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported()
+         self.config.runner.pcmk.load_state(
+             resources=fixture_crm_mon_res_running(
+                 self.stonith_id,
+@@ -518,6 +519,7 @@ class UpdateScsiDevicesMixin:
+                 lrm_monitor_ops=lrm_monitor_ops_updated,
+                 digests_attrs_list=digests_attrs_list_updated,
+             ),
++            with_status=True,
+         )
+         kwargs = dict(devices_updated=devices_updated)
+         if devices_add is not None:
+@@ -560,6 +562,26 @@ class UpdateScsiDevicesFailuresMixin(UpdateScsiDevicesMixin):
+             expected_in_processor=False,
+         )
+ 
++    def test_cibadmin_doesnt_support_update_status(self):
++        self.config.runner.cib.load(
++            resources=fixture_scsi(
++                stonith_id=self.stonith_id, stonith_type=self.stonith_type
++            )
++        )
++        self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported(
++            is_supported=False
++        )
++        self.env_assist.assert_raise_library_error(
++            self.command(),
++            [
++                fixture.error(
++                    reports.codes.STONITH_RESTARTLESS_UPDATE_OF_SCSI_DEVICES_NOT_SUPPORTED,
++                )
++            ],
++            expected_in_processor=False,
++        )
++
+     def test_nonexistent_id(self):
+         """
+         lower level tested in
+@@ -572,6 +594,7 @@ class UpdateScsiDevicesFailuresMixin(UpdateScsiDevicesMixin):
+             )
+         )
+         self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported()
+         self.env_assist.assert_raise_library_error(self.command())
+         self.env_assist.assert_reports(
+             [
+@@ -597,6 +620,7 @@ class UpdateScsiDevicesFailuresMixin(UpdateScsiDevicesMixin):
+             )
+         )
+         self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported()
+         self.env_assist.assert_raise_library_error(
+             self.command(devices_add=[DEV_2], devices_remove=[DEV_1])
+         )
+@@ -949,6 +973,7 @@ class UpdateScsiDevicesFailuresMixin(UpdateScsiDevicesMixin):
+                 lrm_start_ops=DEFAULT_LRM_START_OPS_UPDATED,
+                 lrm_monitor_ops=DEFAULT_LRM_MONITOR_OPS_UPDATED,
+             ),
++            with_status=True,
+         )
+         self.command(force_flags=[reports.codes.SKIP_OFFLINE_NODES])()
+         self.env_assist.assert_reports(
+@@ -1240,6 +1265,7 @@ class UpdateScsiDevicesSetFailuresBaseMixin(
+             )
+         )
+         self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported()
+         self.env_assist.assert_raise_library_error(
+             self.command(devices_updated=())
+         )
+@@ -1271,6 +1297,7 @@ class UpdateScsiDevicesAddRemoveFailuresBaseMixin(
+             )
+         )
+         self.config.runner.pcmk.is_resource_digests_supported()
++        self.config.runner.pcmk.is_cibadmin_update_status_supported()
+         self.env_assist.assert_raise_library_error(
+             self.command(devices_add=(), devices_remove=())
+         )
+diff --git a/pcs_test/tier0/lib/test_env_cib.py b/pcs_test/tier0/lib/test_env_cib.py
+index e23a55a98..8f762e809 100644
+--- a/pcs_test/tier0/lib/test_env_cib.py
++++ b/pcs_test/tier0/lib/test_env_cib.py
+@@ -52,6 +52,11 @@ class ManageCibAssertionMixin:
+             callable_obj, "CIB has been loaded, cannot push custom CIB"
+         )
+ 
++    def assert_raises_cannot_push_status_custom(self, callable_obj):
++        self.assert_raises_cib_error(
++            callable_obj, "Cannot push status section of a custom CIB"
++        )
++
+ 
+ class IsCibLive(TestCase):
+     def test_is_live_when_no_cib_data_specified(self):
+@@ -385,6 +390,16 @@ class PushLoadedCib(TestCase, ManageCibAssertionMixin):
+             ]
+         )
+ 
++    def test_with_status(self):
++        self.config_load_cib_files()
++        self.config.runner.cib.diff(self.tmpfile_old, self.tmpfile_new)
++        self.config.runner.cib.push_diff(with_status=True)
++        env = self.env_assist.get_env()
++
++        env.get_cib()
++        env.push_cib(with_status=True)
++        self.env_assist.assert_reports(self.push_reports())
++
+ 
+ class PushCustomCib(TestCase, ManageCibAssertionMixin):
+     custom_cib = "<custom_cib />"
+@@ -424,6 +439,12 @@ class PushCustomCib(TestCase, ManageCibAssertionMixin):
+             ]
+         )
+ 
++    def test_with_status(self):
++        env = self.env_assist.get_env()
++        self.assert_raises_cannot_push_status_custom(
++            partial(env.push_cib, etree.XML(self.custom_cib), with_status=True)
++        )
++
+ 
+ class PushCibMockedWithWait(TestCase):
+     def setUp(self):
+diff --git a/pcs_test/tools/command_env/config_env.py b/pcs_test/tools/command_env/config_env.py
+index b421c0b21..4782d62db 100644
+--- a/pcs_test/tools/command_env/config_env.py
++++ b/pcs_test/tools/command_env/config_env.py
+@@ -89,6 +89,7 @@ class EnvConfig:
+         wait=-1,
+         exception=None,
+         instead=None,
++        with_status=False,
+         **modifier_shortcuts,
+     ):
+         """
+@@ -115,7 +116,12 @@ class EnvConfig:
+         )
+         self.__calls.place(
+             name,
+-            PushCibCall(cib_xml, wait_timeout=wait, exception=exception),
++            PushCibCall(
++                cib_xml,
++                wait_timeout=wait,
++                exception=exception,
++                with_status=with_status,
++            ),
+             instead=instead,
+         )
+ 
+diff --git a/pcs_test/tools/command_env/config_runner_cib.py b/pcs_test/tools/command_env/config_runner_cib.py
+index 16273b2b0..fabac5a28 100644
+--- a/pcs_test/tools/command_env/config_runner_cib.py
++++ b/pcs_test/tools/command_env/config_runner_cib.py
+@@ -227,17 +227,22 @@ class CibShortcuts:
+         stderr="",
+         returncode=0,
+         env=None,
++        with_status=False,
+     ):
+         """
+         Create a call for pushing a diff of CIBs
+         string name -- key of the call
+         string cib_diff -- the diff of CIBs
+         dict env -- CommandRunner environment variables
++        bool with_status -- if True, expect --update-status flag
+         """
++        cmd = ["cibadmin", "--patch", "--verbose", "--xml-pipe"]
++        if with_status:
++            cmd.append("--update-status")
+         self.__calls.place(
+             name,
+             RunnerCall(
+-                ["cibadmin", "--patch", "--verbose", "--xml-pipe"],
++                cmd,
+                 check_stdin=CheckStdinEqualXml(cib_diff),
+                 stdout=stdout,
+                 stderr=stderr,
+diff --git a/pcs_test/tools/command_env/config_runner_pcmk.py b/pcs_test/tools/command_env/config_runner_pcmk.py
+index 778c5b67e..c944d2f7f 100644
+--- a/pcs_test/tools/command_env/config_runner_pcmk.py
++++ b/pcs_test/tools/command_env/config_runner_pcmk.py
+@@ -885,6 +885,21 @@ class PcmkShortcuts:
+             ),
+         )
+ 
++    def is_cibadmin_update_status_supported(
++        self,
++        name="runner.pcmk.is_cibadmin_update_status_supported",
++        is_supported=True,
++    ):
++        self.__calls.place(
++            name,
++            RunnerCall(
++                ["cibadmin", "--help-all"],
++                stdout="--update-status" if is_supported else "",
++                stderr="",
++                returncode=0,
++            ),
++        )
++
+     def resource_digests(
+         self,
+         resource_id,
+diff --git a/pcs_test/tools/command_env/mock_push_cib.py b/pcs_test/tools/command_env/mock_push_cib.py
+index 186d14f69..67275d0e6 100644
+--- a/pcs_test/tools/command_env/mock_push_cib.py
++++ b/pcs_test/tools/command_env/mock_push_cib.py
+@@ -8,19 +8,28 @@ class Call:
+     type = CALL_TYPE_PUSH_CIB
+ 
+     def __init__(
+-        self, cib_xml, custom_cib=False, wait_timeout=-1, exception=None
++        self,
++        cib_xml,
++        custom_cib=False,
++        wait_timeout=-1,
++        exception=None,
++        with_status=False,
+     ):
+         self.cib_xml = cib_xml
+         self.custom_cib = custom_cib
+         self.wait_timeout = wait_timeout
+         self.exception = exception
++        self.with_status = with_status
+ 
+     def __repr__(self):
+-        return str("<CibPush wait_timeout='{0}'>").format(self.wait_timeout)
++        return (
++            f"<CibPush wait_timeout='{self.wait_timeout}' "
++            f"with_status='{self.with_status}'>"
++        )
+ 
+ 
+ def get_push_cib(call_queue):
+-    def push_cib(lib_env, custom_cib=None, wait_timeout=-1):
++    def push_cib(lib_env, custom_cib=None, wait_timeout=-1, with_status=False):
+         i, expected_call = call_queue.take(CALL_TYPE_PUSH_CIB)
+ 
+         if custom_cib is None and expected_call.custom_cib:
+@@ -62,6 +71,21 @@ def get_push_cib(call_queue):
+                     expected_type=type(expected_call.wait_timeout),
+                 )
+             )
++        if with_status != expected_call.with_status:
++            raise AssertionError(
++                (
++                    "Trying to call env.push_cib (call no. {index}) with "
++                    "'with_status' == {real_value} ({real_type}) but it was "
++                    "expected 'with_status' == {expected_value} "
++                    "({expected_type})"
++                ).format(
++                    index=i,
++                    real_value=with_status,
++                    real_type=type(with_status),
++                    expected_value=expected_call.with_status,
++                    expected_type=type(expected_call.with_status),
++                )
++            )
+ 
+         if expected_call.exception:
+             raise expected_call.exception
+-- 
+2.54.0
+
